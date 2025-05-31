@@ -15,6 +15,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinRm.Cli", "WinRm.Cli\WinRm.Cli.csproj", "{CF00A25B-2FAA-F7C9-C190-F10464913ABA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinRmTests", "Test\WinRmTests\WinRmTests.csproj", "{A8EE7A56-1D69-4F48-B47A-BBA75B6F0489}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTest", "UnitTest", "{FABEC611-9B2C-4F76-9F43-BE804B2DE998}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,9 +33,16 @@ Global
 		{CF00A25B-2FAA-F7C9-C190-F10464913ABA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CF00A25B-2FAA-F7C9-C190-F10464913ABA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CF00A25B-2FAA-F7C9-C190-F10464913ABA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8EE7A56-1D69-4F48-B47A-BBA75B6F0489}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8EE7A56-1D69-4F48-B47A-BBA75B6F0489}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8EE7A56-1D69-4F48-B47A-BBA75B6F0489}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8EE7A56-1D69-4F48-B47A-BBA75B6F0489}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A8EE7A56-1D69-4F48-B47A-BBA75B6F0489} = {FABEC611-9B2C-4F76-9F43-BE804B2DE998}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {29EFF4CF-17FC-4997-B653-DF12A9394ECC}

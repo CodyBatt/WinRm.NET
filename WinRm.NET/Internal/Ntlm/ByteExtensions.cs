@@ -8,7 +8,7 @@
 
     internal static class ByteExtensions
     {
-        public static string ToBase64(this byte[] bytes)
+        public static string ToBase64(this ReadOnlySpan<byte> bytes)
         {
             if (bytes == null || bytes.Length == 0)
             {
@@ -16,6 +16,11 @@
             }
 
             return Convert.ToBase64String(bytes);
+        }
+
+        public static string ToBase64(this byte[] bytes)
+        {
+            return new ReadOnlySpan<byte>(bytes).ToBase64();
         }
 
         public static byte[] FromBase64(this string base64String)
@@ -28,7 +33,7 @@
             return Convert.FromBase64String(base64String);
         }
 
-        public static string ToUtf8String(this byte[] bytes)
+        public static string ToUtf8String(this ReadOnlySpan<byte> bytes)
         {
             if (bytes == null || bytes.Length == 0)
             {
@@ -36,6 +41,11 @@
             }
 
             return Encoding.UTF8.GetString(bytes);
+        }
+
+        public static string ToUtf8String(this byte[] bytes)
+        {
+            return new ReadOnlySpan<byte>(bytes).ToUtf8String();
         }
 
         public static byte[] ToUtf8Bytes(this string str)
@@ -48,7 +58,7 @@
             return Encoding.UTF8.GetBytes(str);
         }
 
-        public static string ToHexString(this byte[] bytes)
+        public static string ToHexString(this ReadOnlySpan<byte> bytes)
         {
             if (bytes == null || bytes.Length == 0)
             {
@@ -56,6 +66,11 @@
             }
 
             return System.Convert.ToHexString(bytes).ToLowerInvariant();
+        }
+
+        public static string ToHexString(this byte[] bytes)
+        {
+            return new ReadOnlySpan<byte>(bytes).ToHexString();
         }
     }
 }

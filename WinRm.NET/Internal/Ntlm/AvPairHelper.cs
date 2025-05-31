@@ -4,10 +4,11 @@
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
+    using System.Runtime.CompilerServices;
     using System.Text;
     using System.Threading.Tasks;
 
-    internal sealed class AvPairParser
+    internal static class AvPairHelper
     {
         public static List<AvPair> Parse(ReadOnlySpan<byte> avList)
         {
@@ -36,6 +37,17 @@
 
             return pairs;
         }
+
+        public static byte[] GetBytes(this List<AvPair> avList)
+        {
+            var bytes = new List<byte>();
+            foreach (AvPair pair in avList)
+            {
+                bytes.AddRange(pair.GetBytes());
+            }
+
+            return bytes.ToArray();
+        }
     }
 
     internal sealed class AvPair
@@ -47,23 +59,13 @@
             this.Value = value;
         }
 
+        public AvPairTypes AvType => (AvPairTypes)Type;
+
         required public ushort Type { get; init; }
 
         required public byte[] Value { get; init; }
 
-        public string TypeName => Type switch {
-            0x0000 => "MsvAvEOL",
-            0x0001 => "MsvAvNbComputerName",
-            0x0002 => "MsvAvNbDomainName",
-            0x0003 => "MsvAvDnsComputerName",
-            0x0004 => "MsvAvDnsDomainName",
-            0x0005 => "MsvAvDnsTreeName",
-            0x0006 => "MsvAvFlags",
-            0x0007 => "MsvAvTimestamp",
-            0x0008 => "MsvAvSingleHost",
-            0x0009 => "MsvAvTargetName",
-            0x000A => "MsvAvChannelBindings",
-            _ => $"Unknown ({Type})" };
+        public string TypeName => AvType.ToString();
 
         public string StringValue()
         {
@@ -77,21 +79,14 @@
             }
             else if (Type == 0x0006)
             {
-                var flags = BitConverter.ToInt32(Value);
+                var flags = (AvFlags)BitConverter.ToInt32(Value);
                 var sb = new StringBuilder("Flags:");
-                if ((flags & 0x00000001) != 0)
+                foreach (var value in Enum.GetValues<AvFlags>())
                 {
-                    sb.Append(" (constrained)");
-                }
-
-                if ((flags & 0x00000002) != 0)
-                {
-                    sb.Append(" (message integrity included)");
-                }
-
-                if ((flags & 0x00000004) != 0)
-                {
-                    sb.Append(" (untrusted target SPN)");
+                    if (flags.HasFlag(value))
+                    {
+                        sb.Append($" ({value})");
+                    }
                 }
 
                 return sb.ToString();
@@ -107,10 +102,19 @@
             }
             else if (Type == 0x000A)
             {
-                return Encoding.ASCII.GetString(Value);
+                return $"Channel Bindings Hash: {Value.ToHexString()}";
             }
 
             return $"Unknown Type (0x{BitConverter.GetBytes(Type).ToHexString()})";
+        }
+
+        public byte[] GetBytes()
+        {
+            var bytes = new List<byte>(4 + Value.Length);
+            bytes.AddRange(BitConverter.GetBytes(Type));
+            bytes.AddRange(BitConverter.GetBytes((ushort)Value.Length));
+            bytes.AddRange(Value);
+            return bytes.ToArray();
         }
     }
 }

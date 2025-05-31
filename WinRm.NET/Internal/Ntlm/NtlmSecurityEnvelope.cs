@@ -4,6 +4,7 @@
     using System.Net.Http.Headers;
     using System.Threading.Tasks;
     using System.Xml;
+    using global::Kerberos.NET.Entities;
     using Microsoft.Extensions.Logging;
 
     internal sealed class NtlmSecurityEnvelope : SecurityEnvelope
@@ -29,14 +30,26 @@
             client.Timeout = TimeSpan.FromSeconds(120);
 
             // Create NTLMSSP negotiate header
-            var negotiate = new NegotiateMessageBuilder();
-            var bytes = negotiate.Build();
-            Log.Dbg(Logger, $"Negotiate: {bytes.ToHexString()}");
-            var token = bytes.ToBase64();
+            var negotiate = new NtlmNegotiate();
+            negotiate.Flags = NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_UNICODE
+                | NtlmNegotiateFlag.NTLMSSP_REQUEST_TARGET
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_SIGN
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_SEAL
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_NTLM_V1
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_ALWAYS_SIGN
+                | NtlmNegotiateFlag.NTLMSSP_TARGET_TYPE_DOMAIN
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_TARGET_INFO
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_VERSION
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_128
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_KEY_EXCH
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_56;
 
+            var bytes = negotiate.GetBytes();
+            Log.Dbg(Logger, $"Negotiate: {bytes.Span.ToHexString()}");
+            var token = bytes.Span.ToBase64();
             var request = new HttpRequestMessage(HttpMethod.Post, winRmProtocol.Endpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Negotiate", token);
-
             var response = await client.SendAsync(request);
             // Deal with the challenge response
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -49,9 +62,12 @@
 
                 var challengeMessage = values.First().Replace("Negotiate ", string.Empty).Trim();
                 var challengeBytes = Convert.FromBase64String(challengeMessage);
-                var challenge = NtlmParser.ParseChallenge(challengeBytes);
+                var challenge = new NtlmChallenge(challengeBytes);
+                var clientChallenge = challenge.GetClientChallenge();
 
-                Logger.Dbg($"Challenge: {challenge.ChallengeBytes.ToHexString()}");
+                //NtlmAuthenticate auth = NtlmAuthenticate.(challenge, credentials.User, credentials.Password ?? string.Empty);
+
+                //Logger.Dbg($"Challenge: {challenge.ChallengeBytes.ToHexString()}");
             }
         }
 
