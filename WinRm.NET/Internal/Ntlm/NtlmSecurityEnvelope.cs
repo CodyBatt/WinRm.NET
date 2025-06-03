@@ -21,6 +21,8 @@
 
         public override AuthType AuthType => AuthType.Ntlm;
 
+        private NtlmEncryptor? Encryptor { get; set; }
+
         public override async Task Initialize(WinRmProtocol winRmProtocol)
         {
             await base.Initialize(winRmProtocol);
@@ -93,16 +95,28 @@
                 {
                     throw new HttpRequestException($"NTLM authentication failed with status code: {authenticateResponse.StatusCode}");
                 }
+
+                Encryptor = new NtlmEncryptor(randomSessionKey);
             }
         }
 
         protected override Task<string> DecodeResponse(HttpResponseMessage response)
         {
+            if (Encryptor == null)
+            {
+                throw new InvalidOperationException("Encryptor is not initialized. Ensure Initialize has been called successfully.");
+            }
+
             throw new NotImplementedException();
         }
 
         protected override void SetContent(HttpRequestMessage request, XmlDocument soapDocument)
         {
+            if (Encryptor == null)
+            {
+                throw new InvalidOperationException("Encryptor is not initialized. Ensure Initialize has been called successfully.");
+            }
+
             throw new NotImplementedException();
         }
 
