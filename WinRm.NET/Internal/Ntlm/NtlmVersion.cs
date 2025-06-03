@@ -23,18 +23,18 @@
 
         public byte MinorVersion { get; set; }
 
-        public short BuildVersion { get; set; } = 0x65; // 26100 in decimal
+        public short BuildVersion { get; set; } = 26100;
 
         public byte NtlmRevision { get; set; } = 15;
 
         protected override void Build()
         {
             var bytes = new List<byte>();
-            bytes.Add((byte)MajorVersion); // Major version
-            bytes.Add((byte)MinorVersion); // Minor version
-            bytes.AddRange(BitConverter.GetBytes((short)BuildVersion)); // build 26100
-            bytes.AddRange(new byte[3]); // Reserved
-            bytes.Add((byte)NtlmRevision); // NTLM revision (15 for NTLMv2)
+            bytes.Add((byte)MajorVersion);
+            bytes.Add((byte)MinorVersion);
+            bytes.AddRange(BitConverter.GetBytes((short)BuildVersion));
+            bytes.AddRange(new byte[3]);
+            bytes.Add((byte)NtlmRevision);
             MessageBuffer = bytes.ToArray();
         }
 

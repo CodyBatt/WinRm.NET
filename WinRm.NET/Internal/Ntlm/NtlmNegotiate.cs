@@ -19,6 +19,8 @@
 
         public NtlmNegotiateFlag Flags { get; set; }
 
+        public NtlmVersion Version { get; set; } = new NtlmVersion();
+
         protected override void Build()
         {
             List<byte> messageBytes = new List<byte>();
@@ -27,18 +29,14 @@
             messageBytes.AddRange(BitConverter.GetBytes((int)Flags)); // Flags
             messageBytes.AddRange(new byte[8]); // OEM DOMAIN - not set, so 8 zero bytes
             messageBytes.AddRange(new byte[8]); // OEM WORKSTATION - not set, so 8 zero bytes
-            // Better to pretend to be windows even though the version is allegedly not used
-            messageBytes.Add((byte)10); // Major version
-            messageBytes.Add((byte)0); // Minor version
-            messageBytes.AddRange(BitConverter.GetBytes((short)26100)); // build 26100
-            messageBytes.AddRange(new byte[3]); // Reserved
-            messageBytes.Add((byte)15); // NTLM revision (15 for NTLMv2)
+            messageBytes.AddRange(Version.GetBytes().Span); // Version
             MessageBuffer = messageBytes.ToArray();
         }
 
         protected override void Parse()
         {
             Flags = (NtlmNegotiateFlag)BinaryPrimitives.ReadInt32LittleEndian(MessageBuffer.Span.Slice(12));
+            Version = new NtlmVersion(MessageBuffer.Slice(32, 8));
         }
     }
 }

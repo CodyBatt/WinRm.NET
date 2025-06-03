@@ -7,18 +7,18 @@
     using System.Text;
     using System.Threading.Tasks;
 
+    // This represents 3 related structures used in different contexts:
+    //
+    // CLIENT_CHALLENGE: TYPES | PADDING | NONCE | PADDING | AV_PAIRS
+    // CLIENT_CHALLENGE_PADDED: CLIENT_CHALLENGE | PADDING (Used to calculate NtProofStr)
+    // CLIENT_CHALLENGE_RESPONSE: NT_PROOF_STR | CLIENT_CHALLENGE_PADDED
+
     internal class NtlmClientChallenge :
         NtlmMessage
     {
         public NtlmClientChallenge()
             : base()
         {
-            ChallengeFromClient = new byte[8];
-            using (RandomNumberGenerator rng = RandomNumberGenerator.Create())
-            {
-                // The array is now filled with cryptographically strong random bytes.
-                rng.GetBytes(new Span<byte>(ChallengeFromClient));
-            }
         }
 
         public NtlmClientChallenge(ReadOnlyMemory<byte> bytes)
@@ -30,11 +30,26 @@
 
         public byte HiRespType { get; private set; } = 0x01;
 
-        public byte[] ChallengeFromClient { get; private set; } = Array.Empty<byte>();
+        public ReadOnlyMemory<byte> ChallengeFromClient { get; set; } = NtlmCrypto.Nonce(8);
 
-        public DateTime Time { get; set; }
+        public long FileTime { get; set; } = DateTime.UtcNow.ToFileTimeUtc();
 
         public List<AvPair> AvPairs { get; set; } = new List<AvPair>();
+
+        public ReadOnlyMemory<byte> GetBytesPadded()
+        {
+            var bytes = new List<byte>(GetBytes(forceBuild: true).ToArray());
+            bytes.AddRange(new byte[4]);
+            return bytes.ToArray();
+        }
+
+        public ReadOnlyMemory<byte> GetBytesNtChallengeResponse(ReadOnlyMemory<byte> ntProofStr)
+        {
+            var bytes = new List<byte>();
+            bytes.AddRange(ntProofStr.Span);
+            bytes.AddRange(GetBytesPadded().Span);
+            return bytes.ToArray();
+        }
 
         protected override void Build()
         {
@@ -42,8 +57,8 @@
             bytes.Add(RespType);
             bytes.Add(HiRespType);
             bytes.AddRange(new byte[6]); // Reserved bytes
-            bytes.AddRange(BitConverter.GetBytes(Time.ToFileTimeUtc())); // Time in file time format
-            bytes.AddRange(ChallengeFromClient);
+            bytes.AddRange(BitConverter.GetBytes(FileTime)); // Time in file time format
+            bytes.AddRange(ChallengeFromClient.Span);
             bytes.AddRange(new byte[4]); // Reserved bytes
             var avBytes = AvPairHelper.GetBytes(AvPairs);
             bytes.AddRange(avBytes);
@@ -63,12 +78,13 @@
             // Offset: 8
             // Timestamp (8 bytes)
             long timestamp = BitConverter.ToInt64(MessageBuffer.Slice(8).Span);
-            Time = DateTime.FromFileTime(timestamp);
+            FileTime = timestamp;
 
             // Offset: 16
             // ChallengeFromClient (8 bytes)
-            ChallengeFromClient = new byte[8];
-            MessageBuffer.Slice(16, 8).Span.CopyTo(ChallengeFromClient);
+            var buffer = new byte[8];
+            MessageBuffer.Slice(16, 8).Span.CopyTo(buffer);
+            ChallengeFromClient = buffer;
 
             // Offset: 28
             // AvPairList (Variable length)

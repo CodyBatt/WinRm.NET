@@ -35,9 +35,7 @@
                 | NtlmNegotiateFlag.NTLMSSP_REQUEST_TARGET
                 | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_SIGN
                 | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_SEAL
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_NTLM_V1
                 | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_ALWAYS_SIGN
-                | NtlmNegotiateFlag.NTLMSSP_TARGET_TYPE_DOMAIN
                 | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY
                 | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_TARGET_INFO
                 | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_VERSION
@@ -45,9 +43,9 @@
                 | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_KEY_EXCH
                 | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_56;
 
-            var bytes = negotiate.GetBytes();
-            Log.Dbg(Logger, $"Negotiate: {bytes.Span.ToHexString()}");
-            var token = bytes.Span.ToBase64();
+            var negotiateBytes = negotiate.GetBytes();
+            Log.Dbg(Logger, $"Negotiate: {negotiateBytes.Span.ToHexString()}");
+            var token = negotiateBytes.Span.ToBase64();
             var request = new HttpRequestMessage(HttpMethod.Post, winRmProtocol.Endpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Negotiate", token);
             var response = await client.SendAsync(request);
@@ -65,9 +63,36 @@
                 var challenge = new NtlmChallenge(challengeBytes);
                 var clientChallenge = challenge.GetClientChallenge();
 
-                //NtlmAuthenticate auth = NtlmAuthenticate.(challenge, credentials.User, credentials.Password ?? string.Empty);
+                // Initialize authenticate message
+                NtlmAuthenticate auth = new NtlmAuthenticate();
+                auth.UserName = credentials.User;
+                auth.DomainName = credentials.Domain;
+                auth.Workstation = System.Environment.MachineName;
+                auth.SetFlags(challenge.Flags);
 
-                //Logger.Dbg($"Challenge: {challenge.ChallengeBytes.ToHexString()}");
+                // Compute the key exchange data
+                var randomSessionKey = NtlmCrypto.CreateRandomSessionKey();
+                var responseKeyNt = NtlmCrypto.ResponseKeyNt(credentials);
+                var ntProofStr = NtlmCrypto.NtProofString(responseKeyNt, challenge.ServerChallenge, clientChallenge.GetBytesPadded());
+
+                auth.NtChallengeResponse = clientChallenge.GetBytesNtChallengeResponse(ntProofStr);
+                var sessionBaseKey = NtlmCrypto.SessionBaseKey(responseKeyNt, ntProofStr);
+                var kxkey = NtlmCrypto.KXKEY(auth.NegotiationFlags, sessionBaseKey);
+                auth.EncryptedRandomSessionKey = NtlmCrypto.TransformRandomSessionKey(kxkey, randomSessionKey);
+
+                // Set the MIC
+                var authenticateBytes = auth.GetBytes();
+                auth.MIC = NtlmCrypto.CalculateMic(randomSessionKey, negotiateBytes, challengeBytes, authenticateBytes);
+
+                // Get bytes again after setting MIC
+                var challengeResponseBytes = auth.GetBytes(forceBuild: true);
+                var challengeResponse = new HttpRequestMessage(HttpMethod.Post, winRmProtocol.Endpoint);
+                challengeResponse.Headers.Authorization = new AuthenticationHeaderValue("Negotiate", challengeResponseBytes.Span.ToBase64());
+                var authenticateResponse = await client.SendAsync(challengeResponse);
+                if (!authenticateResponse.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException($"NTLM authentication failed with status code: {authenticateResponse.StatusCode}");
+                }
             }
         }
 

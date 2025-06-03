@@ -33,7 +33,7 @@
 
             var securityEnvelope = new KerberosSecurityEnvelope(
                 Parent.Logger,
-                new Credentials(User, Password),
+                new Credentials(User, Password!),
                 realm ?? throw new InvalidOperationException("Realm must be specified when AuthType is Kerberos."),
                 kdcInfo ?? throw new InvalidOperationException("KDC information must be specified when AuthType is Kerberos."));
 

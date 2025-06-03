@@ -29,9 +29,8 @@
 
         public string DnsTreeName => (string?)GetValue(AvPairTypes.MsvAvDnsTreeName) ?? string.Empty;
 
-        public DateTime Timestamp => (DateTime?)GetValue(AvPairTypes.MsvAvTimestamp) ?? DateTime.MinValue;
+        public long Timestamp => (long?)GetValue(AvPairTypes.MsvAvTimestamp) ?? 0;
 
-        // Is this the right type of flags? I dont' think so.
         public AvFlags Flags => (AvFlags)GetValue(AvPairTypes.MsvAvFlags)!;
 
         private List<AvPair> AvPairs { get; set; } = new List<AvPair>();
@@ -46,7 +45,7 @@
             var bytes = new List<byte>();
             if (!AvPairs.Any(x => x.AvType == AvPairTypes.MsvAvEOL))
             {
-                AvPairs.Add(new AvPair((ushort)AvPairTypes.MsvAvEOL, Array.Empty<byte>()));
+                AvPairs.Add(new AvPair((ushort)AvPairTypes.MsvAvEOL, new byte[2])); // Value for EOL is 0x0000
             }
 
             MessageBuffer = AvPairHelper.GetBytes(AvPairs);
@@ -77,7 +76,7 @@
                     return (AvFlags)BitConverter.ToInt32(pair.Value, 0);
                 case 0x0007: // MsvAvTimestamp
                     long timestamp = BitConverter.ToInt64(pair.Value, 0);
-                    return DateTime.FromFileTime(timestamp);
+                    return timestamp;
                 case 0x000A: // MsvAvChannelBindings
                     return pair.Value.ToHexString();
             }

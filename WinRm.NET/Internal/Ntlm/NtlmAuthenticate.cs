@@ -1,10 +1,8 @@
 ﻿namespace WinRm.NET.Internal.Ntlm
 {
-    #pragma warning disable CA5351 // Do Not Use Broken Cryptographic Algorithms - This is NTLM, what choice do we have?
+#pragma warning disable CA5351 // Do Not Use Broken Cryptographic Algorithms - This is NTLM, what choice do we have?
 
-    using System.Security.Cryptography;
     using System.Text;
-    using global::Kerberos.NET.Crypto;
     using global::Kerberos.NET.Entities;
 
     internal sealed class NtlmAuthenticate : NtlmMessage
@@ -12,24 +10,12 @@
         public NtlmAuthenticate(ReadOnlyMemory<byte> bytes)
             : base(bytes)
         {
-            RandomSessionKey = new byte[16];
-            using (RandomNumberGenerator rng = RandomNumberGenerator.Create())
-            {
-                // The array is now filled with cryptographically strong random bytes.
-                rng.GetBytes(new Span<byte>(RandomSessionKey));
-            }
         }
 
-        private NtlmAuthenticate()
+        public NtlmAuthenticate()
             : base()
         {
         }
-
-        public ReadOnlyMemory<byte> ResponseKeyNt { get; private set; } = ReadOnlyMemory<byte>.Empty;
-
-        public ReadOnlyMemory<byte> ResponseKeyLm { get; private set; } = ReadOnlyMemory<byte>.Empty;
-
-        public ReadOnlyMemory<byte> NtProofStr { get; private set; } = ReadOnlyMemory<byte>.Empty;
 
         public NtlmNegotiateFlag NegotiationFlags { get; set; }
 
@@ -39,149 +25,19 @@
 
         public string Workstation { get; set; } = string.Empty;
 
-        public byte[] RandomSessionKey { get; set; } = Array.Empty<byte>();
+        public ReadOnlyMemory<byte> LmChallengeResponse { get; set; } = new byte[24];
 
-        public NtlmClientChallenge NtChallengeResponse { get; set; } = new NtlmClientChallenge();
+        public ReadOnlyMemory<byte> NtChallengeResponse { get; set; }
 
-        public static NtlmAuthenticate Create(NtlmChallenge challenge, string user, string domainName, string workstation, string password)
+        public ReadOnlyMemory<byte> EncryptedRandomSessionKey { get; set; }
+
+        public ReadOnlyMemory<byte> MIC { get; set; }
+
+        public void SetFlags(NtlmNegotiateFlag challengeFlags)
         {
-            var userdomain = ExtractUserDomain(user);
-
-            NtlmAuthenticate auth = new NtlmAuthenticate();
-            auth.ResponseKeyNt = NTOWFv2(password, user, userdomain);
-            auth.ResponseKeyLm = LMOWFv2(password, user, userdomain);
-
-            // Set temp to ConcatenationOf(Responserversion, HiResponserversion, Z(6), Time, ClientChallenge, Z(4), ServerName, Z(4))
-            // Time is the timestamp from the challenge
-            // ResponseVersion is 1
-            // HiResponseVersion is 1
-            // ClientChallenge is sent to us from the server in the challenge message
-            // ServerName is the whole ServerInfo AvPairs list from the challenge message
-            var temp = new byte[8];
-
-            // Set NTProofStr to HMAC_MD5(ResponseKeyNT, ConcatenationOf(CHALLENGE_MESSAGE.ServerChallenge,temp))
-            // Set NtChallengeResponse to ConcatenationOf(NTProofStr, temp)
-            // Set LmChallengeResponse to ConcatenationOf(HMAC_MD5(ResponseKeyLM, ConcatenationOf(CHALLENGE_MESSAGE.ServerChallenge, ClientChallenge)), ClientChallenge)
-
-            // If NTLM v2 is used, KeyExchangeKey MUST be set to the given 128-bit SessionBaseKey value.
-
-            return auth;
-        }
-
-        /*
-         * Set MIC to HMAC_MD5(ExportedSessionKey, ConcatenationOf(NEGOTIATE_MESSAGE, CHALLENGE_MESSAGE, AUTHENTICATE_MESSAGE))
-         */
-        internal static ReadOnlyMemory<byte> CalculateMic(
-            ReadOnlyMemory<byte> randomSessionKey,
-            ReadOnlyMemory<byte> negotiateMessage,
-            ReadOnlyMemory<byte> challengeMessage,
-            ReadOnlyMemory<byte> authenticateMessage)
-        {
-            var pal = CryptoPal.Platform;
-            var hmacMd5 = pal.HmacMd5(randomSessionKey);
-            var bytes = new List<byte>();
-            bytes.AddRange(negotiateMessage.Span);
-            bytes.AddRange(challengeMessage.Span);
-            bytes.AddRange(authenticateMessage.Span);
-            return hmacMd5.ComputeHash(bytes.ToArray());
-        }
-
-        internal static ReadOnlyMemory<byte> EncryptedRandomSessionKey(ReadOnlyMemory<byte> keyExchageKey, ReadOnlyMemory<byte> randomSessionKey)
-        {
-            byte[] encryptedRandomSessionKey = new byte[randomSessionKey.Length];
-            RC4.Transform(keyExchageKey.Span, randomSessionKey.Span, encryptedRandomSessionKey);
-            return encryptedRandomSessionKey;
-        }
-
-        internal static ReadOnlyMemory<byte> SessionBaseKey(ReadOnlyMemory<byte> responseKeyNt, ReadOnlyMemory<byte> ntProofStr)
-        {
-            var pal = CryptoPal.Platform;
-            var hmacMd5 = pal.HmacMd5(responseKeyNt);
-            return hmacMd5.ComputeHash(ntProofStr);
-        }
-
-        /*
-         * Specification pseudo-code for NTOWFv1
-         *
-         *  Define NTOWFv1(Passwd, User, UserDom) as MD4(UNICODE(Passwd))
-         *  EndDefine
-         */
-        internal static ReadOnlyMemory<byte> NTOWFv1(string password)
-        {
-            var pal = CryptoPal.Platform;
-            var md4 = pal.Md4();
-            return md4.ComputeHash(Encoding.Unicode.GetBytes(password));
-        }
-
-        /*
-         * Specification pseudo-code for NTOWFv2
-         *
-         *  Define NTOWFv2(Passwd, User, UserDom) as HMAC_MD5(
-         *    MD4(UNICODE(Passwd)), UNICODE(ConcatenationOf( Uppercase(User), UserDom ) ) )
-         *  EndDefine
-         */
-        internal static ReadOnlyMemory<byte> NTOWFv2(string password, string user, string userdom)
-        {
-            var pal = CryptoPal.Platform;
-            var md4 = pal.Md4();
-            var key = md4.ComputeHash(new ReadOnlySpan<byte>(Encoding.Unicode.GetBytes(password)));
-            var hmacMd5 = pal.HmacMd5(key);
-            return hmacMd5.ComputeHash(new ReadOnlyMemory<byte>(Encoding.Unicode.GetBytes(user.ToUpperInvariant() + userdom)));
-        }
-
-        /*  Specification pseudo-code for LMOWFv2
-         *
-         *  Define LMOWFv2(Passwd, User, UserDom) as NTOWFv2(Passwd, User, UserDom)
-         *  EndDefine
-         */
-        internal static ReadOnlyMemory<byte> LMOWFv2(string password, string user, string userdom)
-        {
-            return NTOWFv2(password, user, userdom);
-        }
-
-        // Calculate the KeyExchangeKey
-        internal static ReadOnlyMemory<byte> KXKEY(NtlmNegotiateFlag negFlags, ReadOnlyMemory<byte> sessionBaseKey /*, byte[] lmChallengeResponse, byte[] serverChallenge*/)
-        {
-            if (negFlags.HasFlag(NtlmNegotiateFlag.NTLMSSP_REQUEST_NON_NT_SESSION_KEY))
-            {
-                throw new NotImplementedException("NTLMv1 is not implemented");
-            }
-
-            return sessionBaseKey;
-        }
-
-        internal static string ExtractUserDomain(string user)
-        {
-            const string defaultDomain = ".";
-
-            if (string.IsNullOrEmpty(user))
-            {
-                return defaultDomain;
-            }
-
-            var parts = user.Split('\\', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 1)
-            {
-                return parts[0]; // Return the domain part
-            }
-
-            parts = user.Split('@', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 1)
-            {
-                return parts[1]; // Return the domain part after '@'
-            }
-
-            return defaultDomain; // No domain part found
-        }
-
-        internal static ReadOnlyMemory<byte> NtProofString(ReadOnlyMemory<byte> responseKeyNt, ReadOnlyMemory<byte> clientChallengeBytes, ReadOnlyMemory<byte> serverChallengeBytes)
-        {
-            var pal = CryptoPal.Platform;
-            var hmacMd5 = pal.HmacMd5(responseKeyNt);
-            var bytes = new List<byte>();
-            bytes.AddRange(serverChallengeBytes.Span);
-            bytes.AddRange(clientChallengeBytes.Span);
-            return hmacMd5.ComputeHash(bytes.ToArray());
+            NegotiationFlags = challengeFlags;
+            NegotiationFlags &= ~NtlmNegotiateFlag.NTLMSSP_TARGET_TYPE_DOMAIN;
+            NegotiationFlags &= ~NtlmNegotiateFlag.NTLMSSP_TARGET_TYPE_SERVER;
         }
 
         protected override void Parse()
@@ -191,6 +47,32 @@
 
         protected override void Build()
         {
+            // Variable length payload data:
+            //   - DomainName, UserName, WorksationName, LmChallengeResponse, NtChallengeResponse, EncryptedRandomSessionKey
+            var domainNameBytes = Encoding.Unicode.GetBytes(DomainName);
+            ushort domainNameLength = (ushort)domainNameBytes.Length;
+            int domainNameOffset = 88; // Length of fixed data in the message
+
+            var userNameBytes = Encoding.Unicode.GetBytes(UserName);
+            ushort userNameLength = (ushort)userNameBytes.Length;
+            int userNameOffset = domainNameOffset + domainNameLength;
+
+            var workstationBytes = Encoding.Unicode.GetBytes(Workstation);
+            ushort workstationNameLength = (ushort)workstationBytes.Length;
+            int workstationNameOffset = userNameOffset + userNameLength;
+
+            var lmChallengeBytes = LmChallengeResponse;
+            ushort lmChallengeLength = (ushort)lmChallengeBytes.Length;
+            int lmChallengeOffset = workstationNameOffset + workstationNameLength;
+
+            var ntChallengeBytes = NtChallengeResponse;
+            ushort ntChallengeLength = (ushort)ntChallengeBytes.Length;
+            int ntChallengeOffset = lmChallengeOffset + lmChallengeLength;
+
+            var encryptedRandomSessionKeyBytes = EncryptedRandomSessionKey;
+            ushort encryptedRandomSessionKeyLength = (ushort)encryptedRandomSessionKeyBytes.Length;
+            int encryptedRandomSessionKeyOffset = ntChallengeOffset + ntChallengeLength;
+
             var bytes = new List<byte>();
             // Offset: 0
             // Signature (8 bytes)
@@ -202,53 +84,27 @@
 
             // Offset: 12
             // LMChallengeResponse (8 bytes)
-            bytes.AddRange(new byte[8]); // LMChallengeResponse - not set, so 8 zero bytes
+            bytes.AddPayloadDataReference(lmChallengeOffset, lmChallengeLength);
 
             // Offset: 20
             // NTChallengeResponseFields (8 bytes)
-            var clientChallengeBytes = NtChallengeResponse.GetBytes();
-            ushort clientChallengeLength = (ushort)clientChallengeBytes.Length;
-            int clientChallengeOffset = 88;
-            bytes.AddRange(BitConverter.GetBytes(clientChallengeLength));
-            bytes.AddRange(BitConverter.GetBytes(clientChallengeLength));
-            bytes.AddRange(BitConverter.GetBytes(clientChallengeOffset));
+            bytes.AddPayloadDataReference(ntChallengeOffset, ntChallengeLength);
 
             // Offset: 28
             // DomainNameFields (8 bytes)
-            var domainNameBytes = Encoding.Unicode.GetBytes(DomainName);
-            ushort domainNameLength = (ushort)domainNameBytes.Length;
-            int domainNameOffset = clientChallengeOffset + clientChallengeLength;
-            bytes.AddRange(BitConverter.GetBytes(clientChallengeLength));
-            bytes.AddRange(BitConverter.GetBytes(clientChallengeLength));
-            bytes.AddRange(BitConverter.GetBytes(clientChallengeOffset));
+            bytes.AddPayloadDataReference(domainNameOffset, domainNameLength);
 
             // Offset: 36
             // UserNameFields (8 bytes)
-            var userNameBytes = Encoding.Unicode.GetBytes(UserName);
-            ushort userNameLength = (ushort)userNameBytes.Length;
-            int userNameOffset = domainNameOffset + domainNameLength;
-            bytes.AddRange(BitConverter.GetBytes(userNameLength));
-            bytes.AddRange(BitConverter.GetBytes(userNameLength));
-            bytes.AddRange(BitConverter.GetBytes(userNameOffset));
+            bytes.AddPayloadDataReference(userNameOffset, userNameLength);
 
             // Offset: 44
             // WorkstationNameFields (8 bytes)
-            var workstationBytes = Encoding.Unicode.GetBytes(Workstation);
-            ushort workstationNameLength = (ushort)workstationBytes.Length;
-            int workstationNameOffset = userNameOffset + userNameLength;
-            bytes.AddRange(BitConverter.GetBytes(workstationNameLength));
-            bytes.AddRange(BitConverter.GetBytes(workstationNameLength));
-            bytes.AddRange(BitConverter.GetBytes(workstationNameOffset));
+            bytes.AddPayloadDataReference(workstationNameOffset, (ushort)workstationNameLength);
 
             // Offset: 52
             // EncryptedRandomSessionKeyFields (8 bytes)
-            // TODO: FIX ME!
-            byte[] encryptedRandomSessionKey = new byte[16]; // EncryptedRandomSessionKey() goes here
-            ushort encryptedRandomSessionKeyLength = 16;
-            int encryptedRandomSessionKeyOffset = workstationNameOffset + workstationNameLength;
-            bytes.AddRange(BitConverter.GetBytes(encryptedRandomSessionKeyLength));
-            bytes.AddRange(BitConverter.GetBytes(encryptedRandomSessionKeyLength));
-            bytes.AddRange(BitConverter.GetBytes(encryptedRandomSessionKeyOffset));
+            bytes.AddPayloadDataReference(encryptedRandomSessionKeyOffset, (ushort)EncryptedRandomSessionKey.Length);
 
             // Offset: 60
             // NegotiationFlags (4 bytes)
@@ -260,24 +116,23 @@
 
             // Offset: 72
             // Message Integrity Code (MIC) (16 bytes)
-            bytes.AddRange(new byte[16]);
+            if (MIC.Length == 16)
+            {
+                bytes.AddRange(MIC.Span);
+            }
+            else
+            {
+                bytes.AddRange(new byte[16]);
+            }
 
             // PAYLOAD START
-
-            // Offset: clientChallengeOffset (88)
-            bytes.AddRange(clientChallengeBytes.Span);
-
-            // Offset: domainNameOffset
+            // DomainName, UserName, WorksationName, LmChallengeResponse, NtChallengeResponse, EncryptedRandomSessionKey
             bytes.AddRange(domainNameBytes);
-
-            // Offset: userNameOffset
             bytes.AddRange(userNameBytes);
-
-            // Offset: workstationNameOffset
             bytes.AddRange(workstationBytes);
-
-            // Offset: encryptedRandomSessionKeyOffset
-            bytes.AddRange(encryptedRandomSessionKey);
+            bytes.AddRange(lmChallengeBytes.Span);
+            bytes.AddRange(ntChallengeBytes.Span);
+            bytes.AddRange(EncryptedRandomSessionKey.Span);
 
             MessageBuffer = bytes.ToArray();
         }

@@ -2,6 +2,7 @@
 {
     using System;
     using System.Buffers.Binary;
+    using System.Security.Cryptography;
     using System.Text;
     using global::Kerberos.NET.Entities;
 
@@ -20,17 +21,23 @@
 
         public string TargetName { get; set; } = string.Empty;
 
-        public byte[] ChallengeBytes { get; set; } = Array.Empty<byte>();
+        public ReadOnlyMemory<byte> ServerChallenge { get; set; }
 
         public NtlmNegotiateFlag Flags { get; set; }
 
         public TargetInfo TargetInfo { get; set; } = new TargetInfo();
 
-        public NtlmClientChallenge GetClientChallenge()
+        public NtlmClientChallenge GetClientChallenge(ReadOnlyMemory<byte>? clientChallengeNonce = null, params AvPair[] additionalPairs)
         {
             var clientChallenge = new NtlmClientChallenge();
-            clientChallenge.Time = TargetInfo.Timestamp;
+            if (clientChallengeNonce != null)
+            {
+                clientChallenge.ChallengeFromClient = (ReadOnlyMemory<byte>)clientChallengeNonce;
+            }
+
+            clientChallenge.FileTime = TargetInfo.Timestamp;
             clientChallenge.AvPairs = TargetInfo.GetAvPairs();
+            clientChallenge.AvPairs.AddRange(additionalPairs);
 
             return clientChallenge;
         }
@@ -72,7 +79,7 @@
 
             // Offset: 24
             // Challenge (8 bytes)
-            ChallengeBytes = MessageBuffer.Slice(24, 8).ToArray();
+            ServerChallenge = MessageBuffer.Slice(24, 8).ToArray();
 
             // Offset: 32
             // Reserved (8 bytes)

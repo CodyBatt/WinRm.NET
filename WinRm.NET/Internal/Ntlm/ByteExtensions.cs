@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Security.Cryptography;
     using System.Text;
     using System.Threading.Tasks;
 
@@ -71,6 +72,55 @@
         public static string ToHexString(this byte[] bytes)
         {
             return new ReadOnlySpan<byte>(bytes).ToHexString();
+        }
+
+        internal static string ExtractUserDomain(this string user)
+        {
+            const string defaultDomain = ".";
+
+            if (string.IsNullOrEmpty(user))
+            {
+                return defaultDomain;
+            }
+
+            var parts = user.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 1)
+            {
+                return parts[0]; // Return the domain part
+            }
+
+            parts = user.Split('@', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 1)
+            {
+                return parts[1]; // Return the domain part after '@'
+            }
+
+            return defaultDomain; // No domain part found
+        }
+
+        internal static string ExtractUserName(this string user)
+        {
+            var parts = user.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 1)
+            {
+                return parts[1]; // Return the username part
+            }
+
+            parts = user.Split('@', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 1)
+            {
+                return parts[0]; // Return the user part before '@'
+            }
+
+            return user; // No separator part found
+        }
+
+        internal static List<byte> AddPayloadDataReference(this List<byte> bytes, int offset, ushort length)
+        {
+            bytes.AddRange(BitConverter.GetBytes(length));
+            bytes.AddRange(BitConverter.GetBytes(length));
+            bytes.AddRange(BitConverter.GetBytes(offset));
+            return bytes;
         }
     }
 }

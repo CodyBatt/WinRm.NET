@@ -21,7 +21,7 @@
 
             var securityEnvelope = new NtlmSecurityEnvelope(
                 Parent.Logger,
-                new Credentials(User, Password));
+                new Credentials(User, Password!));
 
             return new WinRmSession(
                 Parent.HttpClientFactory ?? new DefaultHttpClientFactory(),
