@@ -71,7 +71,7 @@
                 var challengeMessage = values.First().Replace("Negotiate ", string.Empty).Trim();
                 var challengeBytes = Convert.FromBase64String(challengeMessage);
                 var challenge = new NtlmChallenge(challengeBytes);
-                var clientChallenge = challenge.GetClientChallenge();
+                var clientChallenge = challenge.GetClientChallenge(null, AvPair.Flags);
 
                 // Initialize authenticate message
                 NtlmAuthenticate auth = new NtlmAuthenticate();
