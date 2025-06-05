@@ -45,6 +45,7 @@
             var authenticationString = $"{credentials.User}:{credentials.Password ?? string.Empty}";
             var base64EncodedAuthenticationString = Convert.ToBase64String(Encoding.UTF8.GetBytes(authenticationString));
             headers.Authorization = new AuthenticationHeaderValue("Basic", base64EncodedAuthenticationString);
+            headers.Add("SOAPAction", string.Empty);
             Logger.Dbg($"Set Basic authentication header: {base64EncodedAuthenticationString}");
         }
 

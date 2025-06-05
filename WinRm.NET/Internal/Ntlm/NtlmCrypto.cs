@@ -53,14 +53,32 @@
 
         internal static ReadOnlyMemory<byte> SessionBaseKey(ReadOnlyMemory<byte> responseKeyNt, ReadOnlyMemory<byte> ntProofStr)
         {
+            return HMAC_MD5(responseKeyNt, ntProofStr);
+        }
+
+        internal static ReadOnlyMemory<byte> HMAC_MD5(ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> data)
+        {
             var pal = CryptoPal.Platform;
-            var hmacMd5 = pal.HmacMd5(responseKeyNt);
-            return hmacMd5.ComputeHash(ntProofStr);
+            var hmacMd5 = pal.HmacMd5(key);
+            return hmacMd5.ComputeHash(data);
         }
 
         internal static ReadOnlyMemory<byte> ResponseKeyNt(Credentials credentials)
         {
             return NTOWFv2(user: credentials.User, userdom: credentials.Domain, password: credentials.Password);
+        }
+
+        internal static Memory<byte> ComputeKey(ReadOnlyMemory<byte> randomSessionKey, bool client, bool signing)
+        {
+            var pal = CryptoPal.Platform;
+            var data = new List<byte>();
+            var from = client ? "client" : "server";
+            var to = client ? "server" : "client";
+            var type = signing ? "signing" : "sealing";
+            var magicConstant = Encoding.ASCII.GetBytes($"session key to {from}-to-{to} {type} key magic constant\0");
+            data.AddRange(randomSessionKey.Span);
+            data.AddRange(magicConstant);
+            return pal.Md5().ComputeHash(data.ToArray()).ToArray();
         }
 
         /*

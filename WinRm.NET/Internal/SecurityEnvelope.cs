@@ -49,11 +49,10 @@
             client.Timeout = TimeSpan.FromSeconds(120); // Hard-coded 2 minute timeout in case no one is home
 
             using var request = new HttpRequestMessage(HttpMethod.Post, this.WinRmProtocol.Endpoint);
+            request.Headers.Add("User-Agent", "WinRM.NET");
+            request.Headers.Add("Connection", "Keep-Alive");
             SetHeaders(request.Headers);
             SetContent(request, soapDocument);
-            request.Headers.Add("User-Agent", "Microsoft WinRM Client");
-            request.Headers.Add("Connection", "Keep-Alive");
-            request.Headers.Add("SOAPAction", string.Empty);
             using var response = await client.SendAsync(request);
             if (response.IsSuccessStatusCode)
             {

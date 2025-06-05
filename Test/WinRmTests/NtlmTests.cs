@@ -284,6 +284,23 @@ namespace WinRmTests
             Assert.Equal("2025-05-29T13:43:20.7972868-06:00", dateTimeStr);
         }
 
+        [Fact]
+        public void GssWrapTest()
+        {
+            var encryptor = new NtlmEncryptor(tvRandomSessionKey);
+            var plaintextBytes = Encoding.Unicode.GetBytes("Plaintext");
+            var expectedSealKey = new byte[] { 0x59, 0xf6, 0x00, 0x97, 0x3c, 0xc4, 0x96, 0x0a, 0x25, 0x48, 0x0a, 0x7c, 0x19, 0x6e, 0x4c, 0x58 };
+            var expectedSignKey = new byte[] { 0x47, 0x88, 0xdc, 0x86, 0x1b, 0x47, 0x82, 0xf3, 0x5d, 0x43, 0xfd, 0x98, 0xfe, 0x1a, 0x2d, 0x39 };
+            Assert.True(SpansAreEqual(expectedSealKey, encryptor.ClientSealingKey.Span));
+            Assert.True(SpansAreEqual(expectedSignKey, encryptor.ClientSigningKey.Span));
+            var expectedEncryptedData = new byte[] { 0x54, 0xe5, 0x01, 0x65, 0xbf, 0x19, 0x36, 0xdc, 0x99, 0x60, 0x20, 0xc1, 0x81, 0x1b, 0x0f, 0x06, 0xfb, 0x5f };
+            var data = encryptor.Encrypt(plaintextBytes);
+            Assert.True(SpansAreEqual(expectedEncryptedData, data.Span));
+            var expectedChecksum = new byte[] { 0x01, 0x00, 0x00, 0x00, 0x7f, 0xb3, 0x8e, 0xc5, 0xc5, 0x5d, 0x49, 0x76, 0x00, 0x00, 0x00, 0x00 };
+            var checksum = encryptor.ComputeSignature(0, plaintextBytes);
+            Assert.True(SpansAreEqual(expectedChecksum, checksum.Span));
+        }
+
         private static bool SpansAreEqual(ReadOnlySpan<byte> s1, ReadOnlySpan<byte> s2)
         {
             if (s1.Length != s2.Length)

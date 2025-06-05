@@ -56,3 +56,4 @@ nunit-*.xml
 /WinRm.NET/.vs/
 
 .vscode/
+/WinRm.Cli/Properties/launchSettings.json
