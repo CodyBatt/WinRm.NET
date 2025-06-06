@@ -1,6 +1,5 @@
 ﻿namespace WinRm.Cli.Commands
 {
-    using System.Net;
     using CommandLine;
     using WinRm.NET;
 

@@ -1,7 +1,6 @@
 ﻿namespace WinRm.NET.Internal.Basic
 {
     using WinRm.NET;
-    using WinRm.NET.Internal.Kerberos;
 
     internal sealed class WinRmBasicBuilder
         : WinRmBuilder<IWinRmBasicSessionBuilder>, IWinRmBasicSessionBuilder

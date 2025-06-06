@@ -2,7 +2,6 @@
 {
     using System;
     using System.Buffers.Binary;
-    using System.Security.Cryptography;
     using System.Text;
     using global::Kerberos.NET.Entities;
 
@@ -37,9 +36,38 @@
 
             clientChallenge.FileTime = TargetInfo.Timestamp;
             clientChallenge.AvPairs = TargetInfo.GetAvPairs();
+            foreach (var pair in additionalPairs)
+            {
+                var existing = clientChallenge.AvPairs.FirstOrDefault(x => x.AvType == pair.AvType);
+                if (existing != null)
+                {
+                    if (existing.AvType == AvPairTypes.MsvAvFlags)
+                    {
+                        var f1 = BitConverter.ToInt32(pair.Value);
+                        var f2 = BitConverter.ToInt32(existing.Value);
+                        pair.Value = BitConverter.GetBytes(f1 | f2);
+                    }
+
+                    clientChallenge.AvPairs.Remove(existing);
+                }
+            }
+
             clientChallenge.AvPairs.AddRange(additionalPairs);
 
             return clientChallenge;
+        }
+
+        public bool Validate()
+        {
+            // Required for Integrity & Confidentiality
+            var pairs = TargetInfo.GetAvPairs();
+            return pairs.Any(x => x.AvType == AvPairTypes.MsvAvNbDomainName)
+                && pairs.Any(x => x.AvType == AvPairTypes.MsvAvDnsComputerName);
+        }
+
+        public bool HasTimestamp()
+        {
+            return TargetInfo.GetAvPairs().Any(x => x.AvType == AvPairTypes.MsvAvTimestamp);
         }
 
         protected override void Build()

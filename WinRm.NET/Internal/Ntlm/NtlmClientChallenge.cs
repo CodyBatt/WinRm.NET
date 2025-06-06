@@ -2,16 +2,6 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
-    using System.Security.Cryptography;
-    using System.Text;
-    using System.Threading.Tasks;
-
-    // This represents 3 related structures used in different contexts:
-    //
-    // CLIENT_CHALLENGE: TYPES | PADDING | NONCE | PADDING | AV_PAIRS
-    // CLIENT_CHALLENGE_PADDED: CLIENT_CHALLENGE | PADDING (Used to calculate NtProofStr)
-    // CLIENT_CHALLENGE_RESPONSE: NT_PROOF_STR | CLIENT_CHALLENGE_PADDED
 
     internal class NtlmClientChallenge :
         NtlmMessage

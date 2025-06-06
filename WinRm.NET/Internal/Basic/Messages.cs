@@ -1,11 +1,5 @@
 ﻿namespace WinRm.NET.Internal.Basic
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
-
     internal static class Messages
     {
         public const string UnauthorizedError = @"

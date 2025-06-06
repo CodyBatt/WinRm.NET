@@ -102,10 +102,13 @@
             }
             else
             {
-                // This will either throw or do nothing
-                HandleErrorResponse(response);
+                var streamContent = new StreamContent(response.Content.ReadAsStream());
 
-                var responseData = await response.Content.ReadAsStringAsync();
+                // This will either throw or do nothing
+                await HandleErrorResponse(response, streamContent);
+
+                var responseData = await streamContent.ReadAsStringAsync();
+
                 // TODO: Define specific exceptions that we will throw from WinRm.NET
                 throw new HttpRequestException($"Error: {response.StatusCode}, {response.ReasonPhrase} SOAP Response: {responseData}");
             }
@@ -123,8 +126,9 @@
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void HandleErrorResponse(HttpResponseMessage response)
+        protected virtual Task HandleErrorResponse(HttpResponseMessage response, StreamContent content)
         {
+            return Task.CompletedTask;
         }
 
         protected abstract void SetHeaders(HttpRequestHeaders headers);

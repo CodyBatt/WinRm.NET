@@ -1,13 +1,7 @@
 ﻿namespace WinRm.NET
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using System.Net.Http;
-    using System.Text;
-    using System.Threading.Tasks;
     using Microsoft.Extensions.Logging;
-    using WinRm.NET.Internal;
     using WinRm.NET.Internal.Basic;
     using WinRm.NET.Internal.Kerberos;
     using WinRm.NET.Internal.Ntlm;

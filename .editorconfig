@@ -26,6 +26,9 @@ dotnet_diagnostic.SA1600.severity = none
 # SA1609 : PropertyDocumentationMustHaveValue
 dotnet_diagnostic.SA1609.severity = none
 
+# SA1601 : Partial classes should be documented
+dotnet_diagnostic.SA1601.severity = none
+
 # SA1629: DocumentationTextMustEndWithAPeriod
 dotnet_diagnostic.SA1629.severity = none
 

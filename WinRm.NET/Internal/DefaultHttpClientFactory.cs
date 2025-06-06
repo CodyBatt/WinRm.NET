@@ -1,10 +1,6 @@
 ﻿namespace WinRm.NET.Internal
 {
     using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
 
     // This is what we use if we aren't provided with an IHttpClientFactory
     internal sealed class DefaultHttpClientFactory : IHttpClientFactory, IDisposable

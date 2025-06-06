@@ -15,17 +15,19 @@
                 cfg.CaseInsensitiveEnumValues = true;
                 cfg.HelpWriter = Console.Out;
             });
-            var result = parser.ParseArguments<RunCommandOptions>(args);
-            if (result is Parsed<RunCommandOptions> parsed)
-            {
-                return await RunCommand(parsed.Value);
-            }
-            else if (result is NotParsed<RunCommandOptions> notParsed)
-            {
-                return await HandleParseError(result, notParsed.Errors);
-            }
 
-            throw new InvalidOperationException("You broke the command line parser.");
+            return await parser.ParseArguments<RunCommandOptions, DebugCommandOptions>(args)
+                .MapResult(
+                (RunCommandOptions opts) => RunCommand(opts),
+                (DebugCommandOptions opts) => DebugCommand(opts),
+                errs => HandleParseError(errs));
+        }
+
+        private static async Task<int> DebugCommand(DebugCommandOptions opts)
+        {
+            var payload = Convert.FromBase64String(opts.Message);
+            await WinRm.NET.Internal.Ntlm.SessionDebug.Debug(opts.Authenticate, opts.Password, payload);
+            return 0;
         }
 
         private static async Task<int> RunCommand(RunCommandOptions opts)
@@ -105,7 +107,7 @@
             return 0;
         }
 
-        private static Task<int> HandleParseError<T>(ParserResult<T> result, IEnumerable<Error> errs)
+        private static Task<int> HandleParseError(IEnumerable<Error> errs)
         {
             return Task.FromResult(1);
         }

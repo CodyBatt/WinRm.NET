@@ -1,7 +1,5 @@
 ﻿namespace WinRm.NET.Internal.Ntlm
 {
-    #pragma warning disable CA5351 // Do Not Use Broken Cryptographic Algorithms - This is NTLM, what choice do we have?
-
     using System.Security.Cryptography;
     using System.Text;
     using global::Kerberos.NET.Crypto;
@@ -26,9 +24,6 @@
             return Nonce(16).ToArray();
         }
 
-        /*
-         * Set MIC to HMAC_MD5(ExportedSessionKey, ConcatenationOf(NEGOTIATE_MESSAGE, CHALLENGE_MESSAGE, AUTHENTICATE_MESSAGE))
-         */
         internal static ReadOnlyMemory<byte> CalculateMic(
             ReadOnlyMemory<byte> randomSessionKey,
             ReadOnlyMemory<byte> negotiateMessage,
@@ -44,7 +39,7 @@
             return hmacMd5.ComputeHash(bytes.ToArray());
         }
 
-        internal static ReadOnlyMemory<byte> TransformRandomSessionKey(ReadOnlyMemory<byte> keyExchageKey, ReadOnlyMemory<byte> randomSessionKey)
+        internal static ReadOnlyMemory<byte> RC4KRandomSessionKey(ReadOnlyMemory<byte> keyExchageKey, ReadOnlyMemory<byte> randomSessionKey)
         {
             byte[] encryptedRandomSessionKey = new byte[randomSessionKey.Length];
             RC4.Transform(keyExchageKey.Span, randomSessionKey.Span, encryptedRandomSessionKey);
@@ -81,36 +76,15 @@
             return pal.Md5().ComputeHash(data.ToArray()).ToArray();
         }
 
-        /*
-         * Specification pseudo-code for NTOWFv1
-         *
-         *  Define NTOWFv1(Passwd, User, UserDom) as MD4(UNICODE(Passwd))
-         *  EndDefine
-         */
-        internal static ReadOnlyMemory<byte> NTOWFv1(string password)
-        {
-            var pal = CryptoPal.Platform;
-            var md4 = pal.Md4();
-            return md4.ComputeHash(Encoding.Unicode.GetBytes(password));
-        }
-
-        /*
-         * Specification pseudo-code for NTOWFv2
-         *
-         *  Define NTOWFv2(Passwd, User, UserDom) as HMAC_MD5(
-         *    MD4(UNICODE(Passwd)), UNICODE(ConcatenationOf( Uppercase(User), UserDom ) ) )
-         *  EndDefine
-         */
         internal static ReadOnlyMemory<byte> NTOWFv2(string user, string userdom, string password)
         {
             var pal = CryptoPal.Platform;
             var md4 = pal.Md4();
-            var key = md4.ComputeHash(new ReadOnlySpan<byte>(Encoding.Unicode.GetBytes(password)));
+            var key = md4.ComputeHash(Encoding.Unicode.GetBytes(password));
             var hmacMd5 = pal.HmacMd5(key);
-            return hmacMd5.ComputeHash(new ReadOnlyMemory<byte>(Encoding.Unicode.GetBytes(user.ToUpperInvariant() + userdom)));
+            return hmacMd5.ComputeHash(Encoding.Unicode.GetBytes(user.ToUpperInvariant() + userdom));
         }
 
-        // Calculate the KeyExchangeKey
         internal static ReadOnlyMemory<byte> KXKEY(NtlmNegotiateFlag negFlags, ReadOnlyMemory<byte> sessionBaseKey /*, byte[] lmChallengeResponse, byte[] serverChallenge*/)
         {
             if (negFlags.HasFlag(NtlmNegotiateFlag.NTLMSSP_REQUEST_NON_NT_SESSION_KEY))

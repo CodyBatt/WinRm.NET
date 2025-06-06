@@ -1,9 +1,7 @@
 ﻿namespace WinRm.NET.Internal.Ntlm
 {
     using WinRm.NET;
-    using WinRm.NET.Internal.Kerberos;
 
-    // Put Ntlm-specific session parameters here
     internal sealed class WinRmNtlmBuilder
         : WinRmBuilder<IWinRmNtlmSessionBuilder>, IWinRmNtlmSessionBuilder
     {

@@ -1,7 +1,5 @@
 ﻿namespace WinRm.NET.Internal.Ntlm
 {
-    using System.IO;
-    using System.Net;
     using System.Net.Http;
     using System.Net.Http.Headers;
     using System.Text;
@@ -9,7 +7,7 @@
     using System.Xml;
     using global::Kerberos.NET.Entities;
     using Microsoft.Extensions.Logging;
-    using Microsoft.Extensions.Primitives;
+    using WinRm.NET.Internal.Ntlm.Http;
 
     internal sealed class NtlmSecurityEnvelope : SecurityEnvelope
     {
@@ -29,7 +27,7 @@
 
         private NtlmEncryptor? Encryptor { get; set; }
 
-        // private AuthenticationHeaderValue? AuthenticationHeader { get; set; }
+        private AuthenticationHeaderValue? AuthenticationHeader { get; set; }
 
         public override async Task Initialize(WinRmProtocol winRmProtocol)
         {
@@ -41,17 +39,18 @@
 
             // Create NTLMSSP negotiate header
             var negotiate = new NtlmNegotiate();
-            negotiate.Flags = NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_UNICODE
-                | NtlmNegotiateFlag.NTLMSSP_REQUEST_TARGET
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_SIGN
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_SEAL
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_ALWAYS_SIGN
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_TARGET_INFO
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_VERSION
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_128
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_KEY_EXCH
-                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_56;
+            negotiate.Flags = NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_SIGN // Integrity, Replay Detect, Sequence Detect
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_SEAL // Confidentiality
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_KEY_EXCH // Confidentiality
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_LM_KEY // Confidentiality
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY // Confidentiality
+                | NtlmNegotiateFlag.NTLMSSP_REQUEST_TARGET // Required by spec
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_NTLM_V1 // Rquired by spec
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_ALWAYS_SIGN // Required by spec
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_UNICODE // Required by spec
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_VERSION // Optional, but we set it to match MS
+                | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_128; // Use 128-bit keys
+                // | NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_56; // We don't support 56 bit encryption
 
             var negotiateBytes = negotiate.GetBytes();
             Log.Dbg(Logger, $"Negotiate: {negotiateBytes.Span.ToHexString()}");
@@ -62,60 +61,63 @@
             // Deal with the challenge response
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Logger.Dbg("Received 401 Unauthorized, processing NTLM challenge.");
                 if (!response.Headers.TryGetValues("WWW-Authenticate", out var values))
                 {
-                    throw new InvalidOperationException("WWW-Authenticate header not found in response.");
+                    throw new InvalidOperationException("[PROTOCOL_ERROR] WWW-Authenticate header not found in response.");
                 }
 
-                var challengeMessage = values.First().Replace("Negotiate ", string.Empty).Trim();
-                var challengeBytes = Convert.FromBase64String(challengeMessage);
-                var challenge = new NtlmChallenge(challengeBytes);
-                var clientChallenge = challenge.GetClientChallenge(null, AvPair.Flags);
-
-                // Initialize authenticate message
-                NtlmAuthenticate auth = new NtlmAuthenticate();
-                auth.UserName = credentials.User;
-                auth.DomainName = credentials.Domain;
-                auth.Workstation = System.Environment.MachineName;
-                auth.SetFlags(challenge.Flags);
-
-                // Compute the key exchange data
-                var randomSessionKey = NtlmCrypto.CreateRandomSessionKey();
-                var responseKeyNt = NtlmCrypto.ResponseKeyNt(credentials);
-                var ntProofStr = NtlmCrypto.NtProofString(responseKeyNt, challenge.ServerChallenge, clientChallenge.GetBytesPadded());
-
-                auth.NtChallengeResponse = clientChallenge.GetBytesNtChallengeResponse(ntProofStr);
-                var sessionBaseKey = NtlmCrypto.SessionBaseKey(responseKeyNt, ntProofStr);
-                var kxkey = NtlmCrypto.KXKEY(auth.NegotiationFlags, sessionBaseKey);
-                auth.EncryptedRandomSessionKey = NtlmCrypto.TransformRandomSessionKey(kxkey, randomSessionKey);
-
-                // Set the MIC
-                var authenticateBytes = auth.GetBytes();
-                auth.MIC = NtlmCrypto.CalculateMic(randomSessionKey, negotiateBytes, challengeBytes, authenticateBytes);
-
-                // Get bytes again after setting MIC
-                var challengeResponseBytes = auth.GetBytes(forceBuild: true);
-                using var challengeResponse = new HttpRequestMessage(HttpMethod.Post, winRmProtocol.Endpoint);
-                challengeResponse.Headers.Authorization = new AuthenticationHeaderValue("Negotiate", challengeResponseBytes.Span.ToBase64());
-                using var authenticationResponse = await client.SendAsync(challengeResponse);
-                if (!authenticationResponse.IsSuccessStatusCode)
+                var challengeMessage = values.FirstOrDefault()?.Replace("Negotiate", string.Empty).Trim();
+                if (string.IsNullOrEmpty(challengeMessage))
                 {
-                    throw new InvalidOperationException("Authentication failed");
+                    throw new InvalidOperationException("[PROTOCOL_ERROR] Got WWW-Authenticate, but it did not contain a challenge. Check negotiate flags.");
                 }
 
-                Encryptor = new NtlmEncryptor(randomSessionKey);
+                var challengeBytes = Convert.FromBase64String(challengeMessage);
+                Logger.Dbg($"Processing NTLM challenge: {challengeBytes.ToHexString()}");
+                var challenge = new NtlmChallenge(challengeBytes);
+                if (!challenge.Validate())
+                {
+                    throw new InvalidOperationException("[PROTOCOL_ERROR] STATUS_LOGON_FAILURE Missing required challenge data.");
+                }
+
+                var result = NtlmAuthenticate.CreateAuthenticateMessage(credentials, negotiateBytes, challengeBytes);
+                AuthenticationHeader = new AuthenticationHeaderValue("Negotiate", result.ChallengeResponse.Span.ToBase64());
+                Encryptor = new NtlmEncryptor(result.SessionKey);
             }
         }
 
-        protected override Task<string> DecodeResponse(HttpResponseMessage response)
+        protected override async Task<string> DecodeResponse(HttpResponseMessage response)
         {
             if (Encryptor == null)
             {
                 throw new InvalidOperationException("Encryptor is not initialized. Ensure Initialize has been called successfully.");
             }
 
-            throw new NotImplementedException();
+            var responseContent = response.Content;
+            if (!responseContent.IsMimeMultipartContent())
+            {
+                throw new InvalidOperationException($"Expected multipart response data. Got '{response.Content.Headers.ContentType}'");
+            }
+
+            var contentStream = await responseContent.ReadAsStreamAsync();
+            var sspContent = new SspMultipartParser(contentStream);
+
+            var sb = new StringBuilder();
+            foreach (var data in sspContent.EncryptedDatas)
+            {
+                var decodedData = Encryptor.Server.Transform(data.Data.Span);
+                var signature = new SspMessageSignature(data.Signature);
+                var computedSignature = Encryptor.Server.ComputeSignature(signature.SequenceNumber, decodedData.Span);
+                var expectedSignature = new SspMessageSignature(computedSignature);
+                if (signature.CheckSum.Span.ToHexString() != expectedSignature.CheckSum.Span.ToHexString())
+                {
+                    throw new InvalidOperationException("Invalid checksum");
+                }
+
+                sb.Append(Encoding.UTF8.GetString(decodedData.Span));
+            }
+
+            return sb.ToString();
         }
 
         protected override void SetContent(HttpRequestMessage request, XmlDocument soapDocument)
@@ -125,9 +127,15 @@
                 throw new InvalidOperationException("Encryptor is not initialized. Ensure Initialize has been called successfully.");
             }
 
+            if (AuthenticationHeader != null)
+            {
+                request.Headers.Authorization = AuthenticationHeader;
+                AuthenticationHeader = null;
+            }
+
             var plaintext = Encoding.UTF8.GetBytes(soapDocument.OuterXml);
-            ReadOnlyMemory<byte> ciphertext = Encryptor.Encrypt(plaintext);
-            ReadOnlyMemory<byte> signature = Encryptor.ComputeSignature(sequenceNumber, plaintext);
+            ReadOnlyMemory<byte> ciphertext = Encryptor.Client.Transform(plaintext);
+            ReadOnlyMemory<byte> signature = Encryptor.Client.ComputeSignature(sequenceNumber, plaintext);
 
             // Build payload: SIGNATURE_LEN | SIGNATURE | ENCRYPTED_DATA
             int signatureLength = signature.Length;
@@ -138,79 +146,11 @@
             ciphertext.CopyTo(payload.Slice(dataOffset));
             this.sequenceNumber++;
 
-            var content = new GssContent(payload);
-            request.Content = content;
+            request.Content = new SspContent(payload);
         }
 
         protected override void SetHeaders(HttpRequestHeaders headers)
         {
-        }
-    }
-
-    // These content classes can probably be replaced once this is working
-    // I'm just using them so that our HTTP request looks
-    // like Microsoft's in terms of newlines and formatting to eliminate
-    // variance.
-    internal class GssContent : HttpContent
-    {
-        //var content = new MultipartContent("encrypted", "Encrypted Boundary");
-        //var contentTypeHeader = new MediaTypeHeaderValue("multipart/encrypted");
-        //contentTypeHeader.Parameters.Add(new NameValueHeaderValue("protocol", "\"application/HTTP-SPNEGO-session-encrypted\""));
-        //contentTypeHeader.Parameters.Add(new NameValueHeaderValue("boundary", "\"Encrypted Boundary\""));
-
-        //var originalDataContent = new StringContent(string.Empty);
-        //originalDataContent.Headers.ContentType = new MediaTypeHeaderValue("application/HTTP-SPNEGO-session-encrypted");
-        //originalDataContent.Headers.Add("OriginalContent", $"application/soap+xml;charset=UTF-8;Length={plaintext.Length}");
-        //content.Add(originalDataContent);
-
-        //Log.Dbg(Logger, $"Plaintext:\r\n{soapDocument.OuterXml}");
-
-        //var encryptedContent = new ReadOnlyMemoryContent(payload);
-        //encryptedContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        //content.Add(encryptedContent);
-        private const string BoundaryFinish = "--Encrypted Boundary--\r\n";
-
-        private ReadOnlyMemory<byte> payload;
-        private string text;
-
-        public GssContent(ReadOnlyMemory<byte> payload)
-        {
-            this.payload = payload;
-            var sb = new StringBuilder();
-            sb.AppendLine("--Encrypted Boundary");
-            sb.AppendLine("Content-Type: application/HTTP-SPNEGO-session-encrypted");
-            sb.AppendLine($"OriginalContent: type=application/soap+xml;charset=UTF-8;Length={payload.Length}");
-            sb.AppendLine("--Encrypted Boundary");
-            sb.AppendLine("Content-Type: application/octet-stream");
-            this.text = sb.ToString();
-
-            this.Headers.ContentType = new GssContentHeader();
-        }
-
-        protected async override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
-        {
-            await stream.WriteAsync(Encoding.ASCII.GetBytes(this.text));
-            await stream.WriteAsync(payload);
-            await stream.WriteAsync(Encoding.ASCII.GetBytes(BoundaryFinish));
-        }
-
-        protected override bool TryComputeLength(out long length)
-        {
-            length = this.text.Length + payload.Length + BoundaryFinish.Length;
-            return true;
-        }
-    }
-
-    internal class GssContentHeader : MediaTypeHeaderValue
-    {
-        public GssContentHeader()
-            : base("multipart/encrypted")
-        {
-        }
-
-        public override string ToString()
-        {
-            return "multipart/encrypted;protocol=\"application/HTTP-SPNEGO-session-encrypted\";boundary=\"Encrypted Boundary\"";
         }
     }
 }

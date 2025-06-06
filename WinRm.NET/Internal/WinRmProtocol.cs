@@ -2,17 +2,9 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.ComponentModel;
-    using System.ComponentModel.Design;
-    using System.Linq;
-    using System.Net;
-    using System.Reflection.PortableExecutable;
-    using System.Security.Cryptography;
     using System.Text;
     using System.Threading.Tasks;
     using System.Xml;
-    using System.Xml.Linq;
-    using Microsoft.Extensions.Options;
 
     internal sealed class WinRmProtocol
     {

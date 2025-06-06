@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Kerberos.NET" Version="4.6.77" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.5" />
     <PackageReference Include="RC4Cryptography" Version="1.0.1" />

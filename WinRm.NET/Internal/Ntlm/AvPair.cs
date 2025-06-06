@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
+    using System.Text;
 
     internal sealed class AvPair
     {
@@ -16,6 +17,10 @@
         public static AvPair Eol => new AvPair(AvPairTypes.MsvAvEOL, Array.Empty<byte>());
 
         public static AvPair Flags => new AvPair(AvPairTypes.MsvAvFlags, BitConverter.GetBytes((int)AvFlags.INTEGRITY));
+
+        public static AvPair EmptyChannelBindings => new AvPair(AvPairTypes.MsvAvChannelBindings, new byte[16]);
+
+        public static AvPair EmptyCstn => new AvPair(AvPairTypes.MsvAvTargetName, Encoding.Unicode.GetBytes(string.Empty));
 
         public ushort Type => (ushort)AvType;
 

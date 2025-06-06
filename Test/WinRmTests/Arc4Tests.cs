@@ -1,10 +1,7 @@
 ﻿namespace WinRmTests
 {
     using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using System.Text;
-    using System.Threading.Tasks;
 
     public class Arc4Tests
     {
@@ -55,36 +52,18 @@
             Assert.Equal(expectedOutput, combined);
         }
 
-        [Fact]
-        public void TestStreamEncryptor()
-        {
-            var encryptor = new WinRm.NET.Internal.Ntlm.NtlmEncryptor(Encoding.ASCII.GetBytes("Key"));
-            var input = new MemoryStream(Encoding.ASCII.GetBytes("Plaintext"));
-            var encryptedStream = encryptor.Encrypt(input);
-            var decryptedStream = encryptor.Decrypt(encryptedStream);
-            decryptedStream.Position = 0;
-            Assert.Equal("Plaintext", new StreamReader(decryptedStream).ReadToEnd());
-
-            encryptedStream = encryptor.Encrypt(new MemoryStream(Encoding.ASCII.GetBytes("Ciphertext")));
-            decryptedStream = encryptor.Decrypt(encryptedStream);
-            decryptedStream.Position = 0;
-            Assert.Equal("Ciphertext", new StreamReader(decryptedStream).ReadToEnd());
-        }
 
         [Fact]
         public void TestLargeBlockEncryption()
         {
-            var data = new String('x', 10000);
-            var encryptor = new WinRm.NET.Internal.Ntlm.NtlmEncryptor(Encoding.ASCII.GetBytes("Key"));
-            using var input = new MemoryStream();
-            using var streamWriter = new StreamWriter(input) { AutoFlush = true };
-            streamWriter.Write(data);
-            var encryptedStream = encryptor.Encrypt(input);
-            var decryptedStream = encryptor.Decrypt(encryptedStream);
-            decryptedStream.Position = 0;
-            using var reader = new StreamReader(decryptedStream);
-            var s = reader.ReadToEnd();
-            Assert.Equal(data, s);
+            var key = Encoding.ASCII.GetBytes("Key");
+            var encryptor = new WinRm.NET.Internal.Ntlm.NtlmEncryptor(key, key, key, key);
+            var data = "Is it right? " + new String('x', 20000) + "Can you do it?";
+            
+            var encryptedStream = encryptor.Client.Transform(Encoding.UTF8.GetBytes(data));
+            var decryptedStream = encryptor.Client.Transform(encryptedStream.Span);
+            var decrypted = Encoding.UTF8.GetString(decryptedStream.Span);
+            Assert.Equal(data, decrypted);
         }
     }
 }

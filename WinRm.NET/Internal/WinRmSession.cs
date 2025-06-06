@@ -1,6 +1,5 @@
 ﻿namespace WinRm.NET.Internal
 {
-    using System.ComponentModel.Design;
     using Microsoft.Extensions.Logging;
 
     internal sealed class WinRmSession

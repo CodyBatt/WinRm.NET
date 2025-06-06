@@ -2,8 +2,6 @@
 {
     using System;
     using System.Text;
-    using global::Kerberos.NET.Entities;
-    using Microsoft.Extensions.Primitives;
 
     internal class TargetInfo : NtlmMessage
     {

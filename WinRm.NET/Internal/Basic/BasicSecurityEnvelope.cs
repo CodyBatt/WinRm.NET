@@ -49,12 +49,14 @@
             Logger.Dbg($"Set Basic authentication header: {base64EncodedAuthenticationString}");
         }
 
-        protected override void HandleErrorResponse(HttpResponseMessage response)
+        protected override Task HandleErrorResponse(HttpResponseMessage response, StreamContent content)
         {
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 throw new HttpRequestException(Messages.UnauthorizedError);
             }
+
+            return base.HandleErrorResponse(response, content);
         }
     }
 }

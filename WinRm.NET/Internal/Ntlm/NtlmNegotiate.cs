@@ -24,12 +24,12 @@
         protected override void Build()
         {
             List<byte> messageBytes = new List<byte>();
-            messageBytes.AddRange(Encoding.ASCII.GetBytes("NTLMSSP\0")); // Signature
-            messageBytes.AddRange(BitConverter.GetBytes((int)1)); // Message type (Negotiate)
-            messageBytes.AddRange(BitConverter.GetBytes((int)Flags)); // Flags
-            messageBytes.AddRange(new byte[8]); // OEM DOMAIN - not set, so 8 zero bytes
-            messageBytes.AddRange(new byte[8]); // OEM WORKSTATION - not set, so 8 zero bytes
-            messageBytes.AddRange(Version.GetBytes().Span); // Version
+            messageBytes.AddRange(Encoding.ASCII.GetBytes("NTLMSSP\0"));
+            messageBytes.AddRange(BitConverter.GetBytes((int)1));
+            messageBytes.AddRange(BitConverter.GetBytes((int)Flags));
+            messageBytes.AddRange(new byte[8]);
+            messageBytes.AddRange(new byte[8]);
+            messageBytes.AddRange(Version.GetBytes().Span);
             MessageBuffer = messageBytes.ToArray();
         }
 

@@ -1,7 +1,5 @@
 ﻿namespace WinRm.NET.Internal.Ntlm
 {
-#pragma warning disable CA5351 // Do Not Use Broken Cryptographic Algorithms - This is NTLM, what choice do we have?
-
     using System.Text;
     using global::Kerberos.NET.Entities;
 
@@ -33,16 +31,97 @@
 
         public ReadOnlyMemory<byte> MIC { get; set; }
 
+        public bool RemoteIsDomainJoined { get; private set; }
+
+        public static (ReadOnlyMemory<byte> ChallengeResponse, ReadOnlyMemory<byte> SessionKey)
+            CreateAuthenticateMessage(Credentials credentials, ReadOnlyMemory<byte> negotiateBytes, ReadOnlyMemory<byte> challengeBytes)
+        {
+            // Initialize authenticate message
+            NtlmChallenge challenge = new NtlmChallenge(challengeBytes);
+            NtlmAuthenticate auth = new NtlmAuthenticate();
+            auth.UserName = credentials.User;
+            auth.DomainName = credentials.Domain;
+            auth.Workstation = System.Environment.MachineName;
+            auth.SetFlags(challenge.Flags);
+
+            // Compute the key exchange data
+            var randomSessionKey = NtlmCrypto.CreateRandomSessionKey();
+            var responseKeyNt = NtlmCrypto.ResponseKeyNt(credentials);
+            var clientChallenge = challenge.GetClientChallenge(null, AvPair.Flags, AvPair.EmptyChannelBindings, AvPair.EmptyCstn);
+            var ntProofStr = NtlmCrypto.NtProofString(responseKeyNt, challenge.ServerChallenge, clientChallenge.GetBytesPadded());
+
+            auth.NtChallengeResponse = clientChallenge.GetBytesNtChallengeResponse(ntProofStr);
+            var sessionBaseKey = NtlmCrypto.SessionBaseKey(responseKeyNt, ntProofStr);
+            var kxkey = NtlmCrypto.KXKEY(auth.NegotiationFlags, sessionBaseKey);
+            auth.EncryptedRandomSessionKey = NtlmCrypto.RC4KRandomSessionKey(kxkey, randomSessionKey);
+
+            // Set the MIC
+            var authenticateBytes = auth.GetBytes();
+            auth.MIC = NtlmCrypto.CalculateMic(randomSessionKey, negotiateBytes, challengeBytes, authenticateBytes);
+
+            // Get bytes again after setting MIC
+            var challengeResponseBytes = auth.GetBytes(forceBuild: true);
+
+            return (ChallengeResponse: challengeResponseBytes, SessionKey: randomSessionKey);
+        }
+
         public void SetFlags(NtlmNegotiateFlag challengeFlags)
         {
+            if (!challengeFlags.HasFlag(NtlmNegotiateFlag.NTLMSSP_NEGOTIATE_128))
+            {
+                throw new InvalidOperationException("[PROTOCOL_ERROR] Target system does not support 128-bit encryption.");
+            }
+
+            RemoteIsDomainJoined = challengeFlags.HasFlag(NtlmNegotiateFlag.NTLMSSP_TARGET_TYPE_DOMAIN);
+
             NegotiationFlags = challengeFlags;
+
+            // clear the target flags. These are just used for the remote host to indicate
+            // whether it is domain joined. We should not send these in the authenticate response.
             NegotiationFlags &= ~NtlmNegotiateFlag.NTLMSSP_TARGET_TYPE_DOMAIN;
             NegotiationFlags &= ~NtlmNegotiateFlag.NTLMSSP_TARGET_TYPE_SERVER;
         }
 
         protected override void Parse()
         {
-            throw new NotImplementedException();
+            var offset = 0;
+            var signature = Encoding.ASCII.GetString(MessageBuffer.Slice(offset, 8).Span);
+            offset += 8;
+
+            var messageType = BitConverter.ToInt32(MessageBuffer.Slice(offset, 4).Span);
+            offset += 4;
+
+            var lmChallengeResponse = new PayloadData(MessageBuffer, offset);
+            offset += PayloadData.Size;
+
+            var ntChallengeResponse = new PayloadData(MessageBuffer, offset);
+            offset += PayloadData.Size;
+
+            var domainName = new PayloadData(MessageBuffer, offset);
+            offset += PayloadData.Size;
+
+            var userName = new PayloadData(MessageBuffer, offset);
+            offset += PayloadData.Size;
+
+            var workstation = new PayloadData(MessageBuffer, offset);
+            offset += PayloadData.Size;
+
+            var encryptedSessionKey = new PayloadData(MessageBuffer, offset);
+            offset += PayloadData.Size;
+
+            NegotiationFlags = (NtlmNegotiateFlag)BitConverter.ToInt32(MessageBuffer.Slice(offset, 4).Span);
+            offset += 4;
+
+            var version = new NtlmVersion(MessageBuffer.Slice(offset, 8));
+            offset += 8;
+
+            MIC = MessageBuffer.Slice(offset, 16).ToArray();
+            LmChallengeResponse = lmChallengeResponse.Data;
+            NtChallengeResponse = ntChallengeResponse.Data;
+            EncryptedRandomSessionKey = encryptedSessionKey.Data;
+            DomainName = Encoding.Unicode.GetString(domainName.Data.Span);
+            UserName = Encoding.Unicode.GetString(userName.Data.Span);
+            Workstation = Encoding.Unicode.GetString(workstation.Data.Span);
         }
 
         protected override void Build()
