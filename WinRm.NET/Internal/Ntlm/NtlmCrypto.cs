@@ -4,6 +4,7 @@
     using System.Text;
     using global::Kerberos.NET.Crypto;
     using global::Kerberos.NET.Entities;
+    using WinRm.NET.Internal.Crypto;
 
     public static class NtlmCrypto
     {
@@ -79,8 +80,7 @@
         internal static ReadOnlyMemory<byte> NTOWFv2(string user, string userdom, string password)
         {
             var pal = CryptoPal.Platform;
-            var md4 = pal.Md4();
-            var key = md4.ComputeHash(Encoding.Unicode.GetBytes(password));
+            var key = Md4.ComputeHash(Encoding.Unicode.GetBytes(password));
             var hmacMd5 = pal.HmacMd5(key);
             return hmacMd5.ComputeHash(Encoding.Unicode.GetBytes(user.ToUpperInvariant() + userdom));
         }
