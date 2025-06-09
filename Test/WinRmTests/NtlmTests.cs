@@ -180,9 +180,9 @@ namespace WinRmTests
             Assert.Equal("dan.vmcloud", challenge.TargetInfo.DnsDomainName);
             Assert.Equal("op-agent-2.dan.vmcloud", challenge.TargetInfo.DnsComputerName);
             Assert.Equal("dan.vmcloud", challenge.TargetInfo.DnsTreeName);
-            var dateTime = DateTime.FromFileTime(challenge.TargetInfo.Timestamp);
+            var dateTime = DateTime.FromFileTime(challenge.TargetInfo.Timestamp).ToUniversalTime();
             var dateTimeStr = dateTime.ToString("o");
-            Assert.Equal("2025-05-29T13:43:20.7972868-06:00", dateTimeStr);
+            Assert.Equal("2025-05-29T19:43:20.7972868Z", dateTimeStr);
         }
 
         [Fact]
