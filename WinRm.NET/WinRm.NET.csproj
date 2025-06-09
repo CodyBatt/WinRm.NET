@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>WinRm.NET</PackageId>
-    <Version>0.0.1-pre</Version>
+    <Version>0.0.1</Version>
     <PackageTags>WinRM</PackageTags>
     <Description>A .NET implementation of a WinRM client.</Description>
     <RepositoryUrl>https://github.com/CodyBatt/WinRm.NET</RepositoryUrl>
