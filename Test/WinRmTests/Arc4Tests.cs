@@ -57,11 +57,12 @@
         public void TestLargeBlockEncryption()
         {
             var key = Encoding.ASCII.GetBytes("Key");
-            var encryptor = new WinRm.NET.Internal.Ntlm.NtlmEncryptor(key, key, key, key);
+            var clientSideEncryptor = new WinRm.NET.Internal.Ntlm.NtlmEncryptor(key, key, key, key);
+            var serverSideEncryptor = new WinRm.NET.Internal.Ntlm.NtlmEncryptor(key, key, key, key);
             var data = "Is it right? " + new String('x', 20000) + "Can you do it?";
             
-            var encryptedStream = encryptor.Client.Transform(Encoding.UTF8.GetBytes(data));
-            var decryptedStream = encryptor.Client.Transform(encryptedStream.Span);
+            var encryptedStream = clientSideEncryptor.Client.Transform(Encoding.UTF8.GetBytes(data));
+            var decryptedStream = serverSideEncryptor.Client.Transform(encryptedStream.Span);
             var decrypted = Encoding.UTF8.GetString(decryptedStream.Span);
             Assert.Equal(data, decrypted);
         }

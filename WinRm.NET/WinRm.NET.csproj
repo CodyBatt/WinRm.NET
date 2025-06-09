@@ -4,6 +4,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>WinRm.NET</PackageId>
+    <Version>0.0.1-pre</Version>
+    <PackageTags>WinRM</PackageTags>
+    <Description>A .NET implementation of a WinRM client.</Description>
+    <RepositoryUrl>https://github.com/CodyBatt/WinRm.NET</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
