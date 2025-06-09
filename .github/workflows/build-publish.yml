@@ -35,7 +35,7 @@ jobs:
         uses: rohith/publish-nuget@v2
         with:
           # Filepath of the project to be packaged, relative to root of repository
-          PROJECT_FILE_PATH: WinRm.NET/WinRM.NET.csproj
+          PROJECT_FILE_PATH: WinRm.NET/WinRm.NET.csproj
 
           # NuGet package id, used for version detection & defaults to project name
           PACKAGE_NAME: WinRm.NET

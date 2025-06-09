@@ -19,6 +19,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinRmTests", "Test\WinRmTes
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTest", "UnitTest", "{FABEC611-9B2C-4F76-9F43-BE804B2DE998}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{75EF24F8-E42D-4E6B-A773-D2C3CB2C29F5}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\build-publish.yml = .github\workflows\build-publish.yml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,6 +48,7 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{A8EE7A56-1D69-4F48-B47A-BBA75B6F0489} = {FABEC611-9B2C-4F76-9F43-BE804B2DE998}
+		{75EF24F8-E42D-4E6B-A773-D2C3CB2C29F5} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {29EFF4CF-17FC-4997-B653-DF12A9394ECC}
