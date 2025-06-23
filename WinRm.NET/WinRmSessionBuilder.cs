@@ -20,13 +20,13 @@
         public IWinRmBasicSessionBuilder WithBasic() => new WinRmBasicBuilder(this);
 
         // Integration points
-        public IWinRm WithLogger(ILogger logger)
+        public IWinRm WithLogger(ILogger? logger)
         {
             Logger = logger;
             return this;
         }
 
-        public IWinRm WithHttpClientFactory(IHttpClientFactory httpClientFactory)
+        public IWinRm WithHttpClientFactory(IHttpClientFactory? httpClientFactory)
         {
             HttpClientFactory = httpClientFactory;
             return this;
