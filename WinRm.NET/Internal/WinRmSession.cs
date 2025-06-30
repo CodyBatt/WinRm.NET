@@ -66,6 +66,11 @@
                         Log.TerminatedCommand(Logger, shellId, commandId);
                     }
                 }
+                catch (Exception ex)
+                {
+                    Log.Dbg(Logger, $"An unexpected error occured: {ex.Message}");
+                    throw;
+                }
                 finally
                 {
                     // Step 5: Close the shell

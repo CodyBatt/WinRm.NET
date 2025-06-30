@@ -15,6 +15,7 @@
     using global::Kerberos.NET.Crypto;
     using global::Kerberos.NET.Entities;
     using Microsoft.Extensions.Logging;
+    using WinRm.NET.Internal.Ntlm;
     using WinRm.NET.Internal.Ntlm.Http;
 
     internal sealed class KerberosSecurityEnvelope : SecurityEnvelope
@@ -43,8 +44,6 @@
         private KerberosCryptoTransformer? Encryptor { get; set; }
 
         private KrbEncryptionKey? Key { get; set; }
-
-        private int SequenceNumber { get; set; }
 
         public void SetLoggerFactory(ILoggerFactory loggerFactory)
         {
@@ -120,9 +119,37 @@
             Encryptor = CryptoService.CreateTransform(SessionContext.ApReq.Authenticator.EType);
         }
 
-        protected override Task<string> DecodeResponse(HttpResponseMessage response)
+        protected override async Task<string> DecodeResponse(HttpResponseMessage response)
         {
-            throw new NotImplementedException();
+            if (Encryptor == null)
+            {
+                throw new InvalidOperationException("Encryptor is not initialized. Ensure Initialize has been called successfully.");
+            }
+
+            if (Key == null)
+            {
+                throw new InvalidOperationException("Encryption Key is not initialized. Ensure Initialize has been called successfully.");
+            }
+
+            var responseContent = response.Content;
+            if (!responseContent.Headers.ContentType?.MediaType?.StartsWith("multipart") ?? false)
+            {
+                throw new InvalidOperationException($"Expected multipart response data. Got '{response.Content.Headers.ContentType}'");
+            }
+
+            var contentStream = await responseContent.ReadAsStreamAsync();
+            var sspContent = new SspMultipartParser(contentStream);
+
+            var sb = new StringBuilder();
+            var payload = sspContent.EncryptedDatas.FirstOrDefault();
+
+            if (payload == null)
+            {
+                throw new InvalidOperationException("No encrypted data found in the response.");
+            }
+
+            var gssUnWrap = new GssUnWrap(Encryptor, Key.AsKey(), payload);
+            return await gssUnWrap.GetString();
         }
 
         protected override void SetContent(HttpRequestMessage request, XmlDocument soapDocument)
@@ -157,6 +184,7 @@
             token.SealedMessage.CopyTo(payload.Slice(dataOffset));
 
             request.Content = new SspContent(payload, plaintext.Length, "application/HTTP-Kerberos-session-encrypted");
+            SessionContext.SequenceNumber++;
         }
 
         protected override void SetHeaders(HttpRequestHeaders headers)

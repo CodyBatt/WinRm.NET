@@ -26,13 +26,12 @@
 
         private readonly KerberosCryptoTransformer cipher;
         private readonly ReadOnlyMemory<byte> data;
-        private readonly ulong sequenceNumber;
 
         public GssWrap(KerberosCryptoTransformer cipher, KerberosKey key, ReadOnlyMemory<byte> data, ulong sequenceNumber)
         {
             this.cipher = cipher;
             this.data = data;
-            this.sequenceNumber = sequenceNumber;
+            this.SequenceNumber = sequenceNumber;
             this.Key = key;
         }
 
@@ -45,6 +44,8 @@
         public bool Sealed { get; set; } = true;
 
         public bool AcceptorSubKey { get; set; } = true;
+
+        private ulong SequenceNumber { get; set; }
 
         public (ReadOnlyMemory<byte> SealedMessage, ReadOnlyMemory<byte> Signature) GetBytes()
         {
@@ -61,7 +62,7 @@
                 TokenId = this.TokenId,
                 Ec = paddingLength,
                 Rrc = 0,
-                SequenceNumber = this.sequenceNumber,
+                SequenceNumber = this.SequenceNumber,
                 SentByAcceptor = this.SentByAcceptor,
                 Sealed = this.Sealed,
                 AcceptorSubKey = this.AcceptorSubKey,
@@ -87,9 +88,10 @@
 
             // The signature is the wrap token bytes + the rotated ciphertext up to the offset (RCC + EC)
             var offset = tokenBytes.Length + wrapToken.Rrc + wrapToken.Ec;
-            var signatureBytes = new Memory<byte>(new byte[tokenBytes.Length + offset]);
+            var signatureBytes = new Memory<byte>(new byte[WrapToken.Length + offset]);
             tokenBytes.CopyTo(signatureBytes);
-            cipherText[..offset].CopyTo(signatureBytes[tokenBytes.Length..]);
+            cipherText[..offset].CopyTo(signatureBytes[WrapToken.Length..]);
+            this.SequenceNumber += 1; // Increment sequence number for next use
             return (cipherText[offset..], signatureBytes);
         }
 
