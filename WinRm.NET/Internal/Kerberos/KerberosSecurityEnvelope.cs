@@ -115,6 +115,7 @@
             var responseHeaderBuffer = Convert.FromBase64String(gssKrb5ApRep);
             var gssToken = GssApiToken.Decode(responseHeaderBuffer);
 
+            // The key returned here is the server session subkey, which is used to encrypt/decrypt WinRM messages
             Key = SessionContext.AuthenticateServiceResponse(gssToken.Token);
             Encryptor = CryptoService.CreateTransform(SessionContext.ApReq.Authenticator.EType);
         }
