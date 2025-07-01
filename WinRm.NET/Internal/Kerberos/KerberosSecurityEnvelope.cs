@@ -39,7 +39,7 @@
 
         public override AuthType AuthType => AuthType.Kerberos;
 
-        private ApplicationSessionContext? SessionContext { get; set; }
+        private WinRmSessionContext? SessionContext { get; set; }
 
         private KerberosCryptoTransformer? Encryptor { get; set; }
 
@@ -86,7 +86,7 @@
             };
 
             // This is the Krb5 context that will be used for this session
-            SessionContext = await krb5Client.GetServiceTicket(rst);
+            SessionContext = new WinRmSessionContext(await krb5Client.GetServiceTicket(rst));
 
             // Encode the AP_REQ in GSS-API for transmission via HTTP
             var requestHeaderBuffer = GssApiToken.Encode(new Oid(MechType.KerberosGssApi), SessionContext.ApReq);
@@ -148,8 +148,8 @@
                 throw new InvalidOperationException("No encrypted data found in the response.");
             }
 
-            var gssUnWrap = new GssUnWrap(Encryptor, Key.AsKey(), payload);
-            return await gssUnWrap.GetString();
+            var gss = new Gss(Encryptor);
+            return Encoding.UTF8.GetString(gss.UnWrap(payload, x => this.Key.AsKey()).Span);
         }
 
         protected override void SetContent(HttpRequestMessage request, XmlDocument soapDocument)
@@ -170,8 +170,8 @@
             }
 
             var plaintext = Encoding.UTF8.GetBytes(soapDocument.OuterXml);
-            var wrap = new GssWrap(Encryptor, Key.AsKey(), plaintext, (ulong)SessionContext.SequenceNumber.Value);
-            var token = wrap.GetBytes();
+            var gss = new Gss(Encryptor);
+            var token = gss.Wrap(plaintext, (ulong)SessionContext.SequenceNumber.Value, x => this.Key.AsKey());
 
             // Build payload: HEADER_LEN | SIGNATURE | SEALED_MESSAGE
             // SIGNATURE is WrapToken + BYTES : ID | FLAGS | FILLER | EC | RCC | SEQ_NUM | "SIGNATURE"

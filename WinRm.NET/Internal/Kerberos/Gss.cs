@@ -1,12 +1,12 @@
 ﻿namespace WinRm.NET.Internal.Kerberos
 {
     using System;
-    using System.Buffers;
     using System.Collections.Generic;
     using System.Linq;
     using global::Kerberos.NET.Crypto;
+    using WinRm.NET.Internal.Ntlm.Http;
 
-    internal class GssWrap
+    internal class Gss(KerberosCryptoTransformer cipher)
     {
         // MS-KILE 3.4.5.4.1
         // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/e94b3acd-8415-4d0d-9786-749d0c39d550
@@ -24,30 +24,13 @@
         // after the header.
         private const int Rrc = 28; // Right rotation count
 
-        private readonly KerberosCryptoTransformer cipher;
-        private readonly ReadOnlyMemory<byte> data;
-
-        public GssWrap(KerberosCryptoTransformer cipher, KerberosKey key, ReadOnlyMemory<byte> data, ulong sequenceNumber)
-        {
-            this.cipher = cipher;
-            this.data = data;
-            this.SequenceNumber = sequenceNumber;
-            this.Key = key;
-        }
-
-        public KerberosKey Key { get; private set; }
-
-        public TokenId TokenId { get; } = TokenId.KrbTokenCfxWrap;
-
         public bool SentByAcceptor { get; set; }
 
         public bool Sealed { get; set; } = true;
 
         public bool AcceptorSubKey { get; set; } = true;
 
-        private ulong SequenceNumber { get; set; }
-
-        public (ReadOnlyMemory<byte> SealedMessage, ReadOnlyMemory<byte> Signature) GetBytes()
+        public (ReadOnlyMemory<byte> SealedMessage, ReadOnlyMemory<byte> Signature) Wrap(ReadOnlyMemory<byte> data, ulong sequenceNumber, Func<Gss, KerberosKey> keyResolver)
         {
             // I don't know why this is 0, but that's what the MS client does and it works.
             // Setting this to zero contradicts the MS-KILE documentation above.
@@ -59,10 +42,10 @@
             // Create a wrap token with Rrc set to 0 which is included in encrypted data.
             var wrapToken = new WrapToken
             {
-                TokenId = this.TokenId,
+                TokenId = TokenId.KrbTokenCfxWrap,
                 Ec = paddingLength,
                 Rrc = 0,
-                SequenceNumber = this.SequenceNumber,
+                SequenceNumber = sequenceNumber,
                 SentByAcceptor = this.SentByAcceptor,
                 Sealed = this.Sealed,
                 AcceptorSubKey = this.AcceptorSubKey,
@@ -70,14 +53,14 @@
             var tokenBytes = wrapToken.GetBytes();
 
             // We have data, padding and token bytes to encrypt, copy them all into a new buffer.
-            var bytes = new Memory<byte>(new byte[this.data.Length + paddingLength + tokenBytes.Length]);
-            this.data.CopyTo(bytes);
-            padding.CopyTo(bytes.Span[this.data.Length..]);
-            var tokenOffset = this.data.Length + paddingLength;
+            var bytes = new Memory<byte>(new byte[data.Length + paddingLength + tokenBytes.Length]);
+            data.CopyTo(bytes);
+            padding.CopyTo(bytes.Span[data.Length..]);
+            var tokenOffset = data.Length + paddingLength;
             tokenBytes.CopyTo(bytes[tokenOffset..]);
 
             // Encrypt the payload DATA | PADDING | WRAP_TOKEN
-            var cipherText = this.cipher.Encrypt(bytes, this.Key, KeyUsage.InitiatorSeal);
+            var cipherText = cipher.Encrypt(bytes, keyResolver(this), KeyUsage.InitiatorSeal);
 
             // Apply the rotation to the ciphertext
             wrapToken.Rrc = Rrc;
@@ -91,11 +74,43 @@
             var signatureBytes = new Memory<byte>(new byte[WrapToken.Length + offset]);
             tokenBytes.CopyTo(signatureBytes);
             cipherText[..offset].CopyTo(signatureBytes[WrapToken.Length..]);
-            this.SequenceNumber += 1; // Increment sequence number for next use
             return (cipherText[offset..], signatureBytes);
         }
 
-        public static Memory<byte> Rotate(ReadOnlySpan<byte> bytes, int numBytes)
+        public ReadOnlyMemory<byte> UnWrap(EncryptedData data, Func<Gss, KerberosKey> keyResolver)
+        {
+            var wrapToken = WrapToken.FromBytes(data.Signature);
+            this.AcceptorSubKey = wrapToken.AcceptorSubKey;
+            this.SentByAcceptor = wrapToken.SentByAcceptor;
+            this.Sealed = wrapToken.Sealed;
+
+            var dataPrefixLength = data.Signature.Length - WrapToken.Length - wrapToken.Ec;
+            var dataPrefixOffset = data.Signature.Length - dataPrefixLength;
+            var rotatedCipherTextLen = dataPrefixLength + data.Data.Length;
+
+            var rotated = new byte[rotatedCipherTextLen];
+            data.Signature.Span[dataPrefixOffset..].CopyTo(rotated.AsSpan(0, dataPrefixLength));
+            data.Data.Span.CopyTo(rotated.AsSpan(dataPrefixLength, data.Data.Length));
+            var cipherText = UnRotate(rotated, wrapToken.Rrc + wrapToken.Ec);
+
+            var plainText = cipher.Decrypt(cipherText, keyResolver(this), KeyUsage.AcceptorSeal);
+
+            var extraBytes = wrapToken.Ec + data.Signature.Length;
+            return plainText.Slice(0, plainText.Length - WrapToken.Length);
+        }
+
+        internal static Memory<byte> UnRotate(ReadOnlySpan<byte> data, int numBytes)
+        {
+            numBytes %= data.Length;
+
+            var result = new byte[data.Length];
+            data[numBytes..].CopyTo(result);
+            data[..numBytes].CopyTo(result.AsSpan(result.Length - numBytes));
+
+            return result;
+        }
+
+        internal static Memory<byte> Rotate(ReadOnlySpan<byte> bytes, int numBytes)
         {
             numBytes %= bytes.Length;
             int left = bytes.Length - numBytes;
