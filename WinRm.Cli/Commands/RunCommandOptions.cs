@@ -1,16 +1,21 @@
 ﻿namespace WinRm.Cli.Commands
 {
     using CommandLine;
+    using Serilog;
+    using Serilog.Extensions.Logging;
     using WinRm.NET;
 
     [Verb("run", HelpText = "Run a remote command with WinRm")]
-    public class RunCommandOptions
+    public class RunCommandOptions : ICliCommand
     {
         [Option('s', "security", Required = false, HelpText = "Specify the security protocol to use: Kerberos, Ntlm or Basic", Default = AuthType.Kerberos)]
         public AuthType Authentication { get; set; }
 
         [Option('c', "command", Required = true, HelpText = "Specify the command to run")]
         required public string Command { get; set; }
+
+        [Option('e', "encoded", Required = false, HelpText = "Indicates that the command is base64 encoded powershell", Default = false)]
+        required public bool Encoded { get; set; } = false;
 
         [Option('a', "args", Required = false, HelpText = "Specify command arguments")]
         public IEnumerable<string>? Arguments { get; set; }
@@ -36,5 +41,96 @@
 
         [Option('S', "spn", Required = false, HelpText = "Specify the Kerberos SPN of the host target.")]
         public string? Spn { get; set; }
+
+        public async Task<int> Execute()
+        {
+            RunCommandOptions opts = this;
+
+            // If using DI, register this in the container and configure it
+            // with logging and httpclientfactory
+            var sessionBuilder = new WinRmSessionBuilder();
+            if (opts.Verbose == true)
+            {
+                // Set up logging
+                using var log = new LoggerConfiguration()
+                .WriteTo.Console()
+                .MinimumLevel.Debug()
+                .CreateLogger();
+                var logBridge = new SerilogLoggerFactory(log);
+                sessionBuilder.WithLogger(logBridge);
+                Log.Logger = log;
+            }
+
+            // Create the session
+            using IWinRmSession session = opts.Authentication switch
+            {
+                AuthType.Kerberos => sessionBuilder.WithKerberos()
+                    .WithUser(opts.UserName)
+                    .WithPassword(opts.Password!)
+                    .WithRealmName(opts.RealmName)
+                    .WithKdc(opts.Kdc!)
+                    .WithSpn(opts.Spn)
+                    .Build(opts.HostName),
+                AuthType.Ntlm => sessionBuilder.WithNtlm()
+                    .WithUser(opts.UserName)
+                    .WithPassword(opts.Password!)
+                    .Build(opts.HostName),
+                AuthType.Basic => sessionBuilder.WithBasic()
+                    .WithUser(opts.UserName)
+                    .WithPassword(opts.Password!)
+                    .Build(opts.HostName),
+                _ => throw new NotImplementedException($"Authentication mode '{opts.Authentication}' is not implemented.")
+            };
+
+            IWinRmResult result;
+            if (opts.Encoded)
+            {
+                var encodedCommand = opts.Command;
+                var command = "powershell.exe";
+                var args = new string[]
+                {
+                    "-EncodedCommand",
+                    encodedCommand,
+                };
+                Serilog.Log.Debug("Running encoded command: ====");
+                Serilog.Log.Debug(System.Text.Encoding.Unicode.GetString(System.Convert.FromBase64String(encodedCommand)));
+                Serilog.Log.Debug("====");
+                result = await session.Run(command, args);
+            }
+            else
+            {
+                result = await session.Run(opts.Command, opts.Arguments);
+            }
+
+            // Show results
+            if (result.IsSuccess)
+            {
+                if (!string.IsNullOrEmpty(result.Output))
+                {
+                    Console.WriteLine(result.Output);
+                }
+                else
+                {
+                    Console.WriteLine($"Command '{opts.Command}' executed successfully and returned no output.");
+                }
+
+                if (!string.IsNullOrEmpty(result.Error))
+                {
+                    var color = Console.ForegroundColor;
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"{result.Error}");
+                    Console.ForegroundColor = color;
+                }
+            }
+            else
+            {
+                var color = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"{result.ErrorMessage}");
+                Console.ForegroundColor = color;
+            }
+
+            return 0;
+        }
     }
 }
