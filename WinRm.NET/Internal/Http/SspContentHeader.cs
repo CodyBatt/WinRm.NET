@@ -1,4 +1,4 @@
-﻿namespace WinRm.NET.Internal.Ntlm.Http
+﻿namespace WinRm.NET.Internal.Http
 {
     using System.Net.Http.Headers;
 
@@ -14,7 +14,7 @@
 
         public override string ToString()
         {
-            return $"multipart/encrypted;protocol=\"{this.contentType}\";boundary=\"Encrypted Boundary\"";
+            return $"multipart/encrypted;protocol=\"{contentType}\";boundary=\"Encrypted Boundary\"";
         }
     }
 }

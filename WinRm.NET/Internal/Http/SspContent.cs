@@ -1,4 +1,4 @@
-﻿namespace WinRm.NET.Internal.Ntlm.Http
+﻿namespace WinRm.NET.Internal.Http
 {
     using System.IO;
     using System.Net;
@@ -11,9 +11,10 @@
     // this class. Need to revisit this.
     internal class SspContent : HttpContent
     {
+        internal const string Crlf = "\r\n";
         internal const string BoundaryStart = "--Encrypted Boundary";
         internal const string BoundaryFinishMarker = BoundaryStart + "--";
-        internal const string BoundaryFinish = BoundaryFinishMarker + "\r\n";
+        internal const string BoundaryFinish = BoundaryFinishMarker + Crlf;
 
         private ReadOnlyMemory<byte> payload;
         private string text;
@@ -22,11 +23,11 @@
         {
             this.payload = payload;
             var sb = new StringBuilder();
-            sb.AppendLine("--Encrypted Boundary");
-            sb.AppendLine($"Content-Type: {contentType}");
-            sb.AppendLine($"OriginalContent: type=application/soap+xml;charset=UTF-8;Length={originalContentLength}");
-            sb.AppendLine("--Encrypted Boundary");
-            sb.AppendLine("Content-Type: application/octet-stream");
+            sb.Append("--Encrypted Boundary" + Crlf);
+            sb.Append($"Content-Type: {contentType}" + Crlf);
+            sb.Append($"OriginalContent: type=application/soap+xml;charset=UTF-8;Length={originalContentLength}" + Crlf);
+            sb.Append("--Encrypted Boundary" + Crlf);
+            sb.Append("Content-Type: application/octet-stream" + Crlf);
             text = sb.ToString();
 
             Headers.ContentType = new SspContentHeader(contentType);

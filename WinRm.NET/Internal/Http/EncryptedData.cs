@@ -1,4 +1,4 @@
-﻿namespace WinRm.NET.Internal.Ntlm.Http
+﻿namespace WinRm.NET.Internal.Http
 {
     using System.IO;
 

@@ -3,7 +3,7 @@
     using System.IO;
     using System.Text;
     using System.Text.RegularExpressions;
-    using WinRm.NET.Internal.Ntlm.Http;
+    using WinRm.NET.Internal.Http;
 
     // I tried to use the multipart extension methods from
     // Microsoft.AspNet.WebApi.Client, but they blew up when

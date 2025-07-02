@@ -4,7 +4,7 @@
     using System.Collections.Generic;
     using System.Linq;
     using global::Kerberos.NET.Crypto;
-    using WinRm.NET.Internal.Ntlm.Http;
+    using WinRm.NET.Internal.Http;
 
     internal class Gss(KerberosCryptoTransformer cipher)
     {

@@ -15,8 +15,8 @@
     using global::Kerberos.NET.Crypto;
     using global::Kerberos.NET.Entities;
     using Microsoft.Extensions.Logging;
+    using WinRm.NET.Internal.Http;
     using WinRm.NET.Internal.Ntlm;
-    using WinRm.NET.Internal.Ntlm.Http;
 
     internal sealed class KerberosSecurityEnvelope : SecurityEnvelope
     {
