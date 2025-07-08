@@ -52,13 +52,11 @@
             if (opts.Verbose == true)
             {
                 // Set up logging
-                using var log = new LoggerConfiguration()
-                .WriteTo.Console()
-                .MinimumLevel.Debug()
-                .CreateLogger();
-                var logBridge = new SerilogLoggerFactory(log);
-                sessionBuilder.WithLogger(logBridge);
-                Log.Logger = log;
+                Log.Logger = new LoggerConfiguration()
+                    .WriteTo.Console()
+                    .MinimumLevel.Debug()
+                    .CreateLogger();
+                sessionBuilder.WithLogger(new SerilogLoggerFactory(Log.Logger));
             }
 
             // Create the session
