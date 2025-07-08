@@ -99,7 +99,7 @@
             }
             else
             {
-                result = await session.Run(opts.Command, opts.Arguments);
+                result = await session.Run(opts.Command, opts.Arguments?.ToArray());
             }
 
             // Show results

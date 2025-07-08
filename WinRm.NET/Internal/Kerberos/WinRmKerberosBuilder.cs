@@ -15,7 +15,7 @@
         {
         }
 
-        public override IWinRmSession Build(string host)
+        public override IWinRmSession Build(string host, int? port = null)
         {
             if (User == null)
             {
@@ -44,11 +44,11 @@
                 securityEnvelope.SetLoggerFactory(this.Parent.LoggerFactory);
             }
 
-            return new WinRmSession(
+            return new WinRmSession(host,
+                securityEnvelope,
                 Parent.HttpClientFactory ?? new DefaultHttpClientFactory(),
                 Parent.Logger,
-                host,
-                securityEnvelope);
+                port);
         }
 
         public IWinRmKerberosSessionBuilder WithRealmName(string realm)

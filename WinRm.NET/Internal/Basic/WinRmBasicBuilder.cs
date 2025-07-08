@@ -10,7 +10,7 @@
         {
         }
 
-        public override IWinRmSession Build(string host)
+        public override IWinRmSession Build(string host, int? port = null)
         {
             if (User == null)
             {
@@ -21,11 +21,11 @@
                 Parent.Logger,
                 new Credentials(User, Password!));
 
-            return new WinRmSession(
+            return new WinRmSession(host,
+                securityEnvelope,
                 Parent.HttpClientFactory ?? new DefaultHttpClientFactory(),
                 Parent.Logger,
-                host,
-                securityEnvelope);
+                port);
         }
     }
 }

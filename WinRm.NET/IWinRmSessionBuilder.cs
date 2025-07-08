@@ -2,7 +2,7 @@
 {
     public interface IWinRmSessionBuilder
     {
-        IWinRmSession Build(string host);
+        IWinRmSession Build(string host, int? port = null);
     }
 
     public interface IWinRmSessionBuilder<T>

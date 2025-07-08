@@ -6,6 +6,6 @@
 
     public interface IWinRmSession : IDisposable
     {
-        Task<IWinRmResult> Run(string command, IEnumerable<string>? arguments = null);
+        Task<IWinRmResult> Run(string command, params string[]? arguments);
     }
 }

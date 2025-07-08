@@ -15,7 +15,7 @@
         {
             this.parent = parent;
             this.securityEnvelope = securityEnvelope;
-            Endpoint = new Uri($"http://{parent.Host}:5985/wsman");
+            Endpoint = new Uri($"http://{parent.Host}:{parent.Port}/wsman");
         }
 
         public Uri Endpoint { get; }
