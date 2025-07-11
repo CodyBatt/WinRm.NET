@@ -13,11 +13,11 @@ Add the Nuget package `WinRm.NET` to your project.
 
 If you are using Microsoft DI, register WinRm.NET:
 ```csharp
-serviceCollection.RegisterWinRm();
+serviceCollection.AddWinRm();
 ```
-You can also create an instance of the `WinRmSessionBuilder` class manually. `WinRmSessionBuilder` implements `IWinRM`.
+You can also create an instance of the `WinRmSessionBuilder` class manually. `WinRmSessionBuilder` implements `IWinRm`.
 
-Inject an `IWinRm` interface into your class and use it to create a session. The session can then be used to run commands on the remote host. Results are returned 
+Inject an `IWinRm` interface into your class and use it to create a session. The session can then be used to run commands on the remote host. Results are returned as text in the `Output` or `Error` properties of the `IWinRmResult`.
 
 ```csharp
 class SomeClass(IWinRm winrm)
@@ -36,7 +36,8 @@ class SomeClass(IWinRm winrm)
         }
         else
         {
-            Console.WriteLine("Error: " + result.ErrorMessage);  
+            Console.WriteLine("Error: " + result.ErrorMessage);
+            Console.WriteLine(result.Error);
         }
     }
 }
@@ -46,6 +47,10 @@ class SomeClass(IWinRm winrm)
 Basic, NTLM, and Kerberos authentication are supported. Each authentication mechanism has different requirements. Call `WithBasic()`, `WithNtlm()` or `WithKerberos()` to see options. Negotiate maybe added at a later time. Anonymous connections are not supported. NTLMv1 is not supported. Ideally, you would always use Kerberos. Support for Windows 2025 IAKerb and LocalKDC is planned so that Kerberos can be used even for Windows machines that are not joined to a domain.
 
 # Integration Points
-You can configure WinRM.NET to log to your logging setup by providing an instance of `ILogger` to `IWinRm.WithLogger()`.
+You can configure the HttpClient used by WinRM by providing an action delegate when registering with DI:
 
-You can configure IWinRm to use your `IHttpClientFactory` configuration by passing an `IHttpClientFactory` to `IWinRm.WithHttpClientFactory()`.
+```csharp
+serviceCollection.AddWinRm().ConfigureHttpClient(client => {
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
+```
