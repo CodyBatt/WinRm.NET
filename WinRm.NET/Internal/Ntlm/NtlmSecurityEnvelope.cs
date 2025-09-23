@@ -7,7 +7,7 @@
     using System.Xml;
     using global::Kerberos.NET.Entities;
     using Microsoft.Extensions.Logging;
-    using WinRm.NET.Internal.Ntlm.Http;
+    using WinRm.NET.Internal.Http;
 
     internal sealed class NtlmSecurityEnvelope : SecurityEnvelope
     {
@@ -146,7 +146,7 @@
             ciphertext.CopyTo(payload.Slice(dataOffset));
             this.sequenceNumber++;
 
-            request.Content = new SspContent(payload);
+            request.Content = new SspContent(payload, plaintext.Length, "application/HTTP-SPNEGO-session-encrypted");
         }
 
         protected override void SetHeaders(HttpRequestHeaders headers)

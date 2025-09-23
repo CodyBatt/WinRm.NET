@@ -15,7 +15,7 @@
         {
             this.parent = parent;
             this.securityEnvelope = securityEnvelope;
-            Endpoint = new Uri($"http://{parent.Host}:5985/wsman");
+            Endpoint = new Uri($"http://{parent.Host}:{parent.Port}/wsman");
         }
 
         public Uri Endpoint { get; }
@@ -67,6 +67,8 @@
             SoapHelper.PopulateNamespaces(xmlns);
             CommandResult commandResult = new CommandResult();
 
+            response = await WaitForCompletion(commandId, xmlDocument, response, xmlns);
+
             // Get the command state / status code
             var exitCode = response.SelectSingleNode("//ExitCode", xmlns);
             if (exitCode != null)
@@ -85,7 +87,7 @@
             var stderr = response.SelectNodes("//rsp:Stream[@Name='stderr']", xmlns);
             if (stderr != null)
             {
-                commandResult.StdError = ExtractStream(stderr);
+                commandResult.StdError = CleanupPsError(ExtractStream(stderr));
             }
 
             return commandResult;
@@ -111,6 +113,19 @@
             await securityEnvelope.SendMessage(xmlDocument);
         }
 
+        private async Task<XmlDocument> WaitForCompletion(string commandId, XmlDocument xmlDocument, XmlDocument response, XmlNamespaceManager xmlns)
+        {
+            var state = response.SelectSingleNode($"//rsp:CommandState[@CommandId='{commandId.ToUpperInvariant()}']", xmlns);
+            while (state?.Attributes?["State"]?.InnerText == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/CommandState/Running")
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                response = await securityEnvelope.SendMessage(xmlDocument);
+                state = response.SelectSingleNode($"//rsp:CommandState[@CommandId='{commandId.ToUpperInvariant()}']", xmlns);
+            }
+
+            return response;
+        }
+
         // Output streams are delivered as a sequence of base64 encoded XML nodes
         // which can span over nodes, so we collect the bytes from each into a list
         // then decode it all at the end.
@@ -130,6 +145,36 @@
             }
 
             return Encoding.UTF8.GetString(bytes.ToArray());
+        }
+
+        private static string CleanupPsError(string error)
+        {
+            if (!error.StartsWith("#< CLIXML"))
+            {
+                return error;
+            }
+
+            error = error.Replace("#< CLIXML\r\n", string.Empty);
+            error = error.Replace("xmlns=\"http://schemas.microsoft.com/powershell/2004/04\"", string.Empty);
+
+            var xml = new XmlDocument();
+            xml.LoadXml(error);
+            var errorNodes = xml.SelectNodes("//S[@S='Error']");
+
+            if (errorNodes != null)
+            {
+                var sb = new StringBuilder();
+                for (int i = 0; i < errorNodes.Count; i++)
+                {
+                    var node = errorNodes[i]!;
+                    var text = node.InnerText.Replace("_x000D_", "\r").Replace("_x000A_", "\n");
+                    sb.Append(text);
+                }
+
+                return sb.ToString();
+            }
+
+            return error; // Fallback to original error if no message found
         }
     }
 }

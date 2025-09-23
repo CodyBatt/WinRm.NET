@@ -5,14 +5,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>WinRm.NET</PackageId>
-    <Version>0.0.1</Version>
+    <Version>0.0.2-pre1</Version>
     <PackageTags>WinRM</PackageTags>
     <Description>A .NET implementation of a WinRM client.</Description>
     <RepositoryUrl>https://github.com/CodyBatt/WinRm.NET</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Kerberos.NET" Version="4.6.77" />
+    <PackageReference Include="Kerberos.NET" Version="4.6.116" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.5" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.1.118">

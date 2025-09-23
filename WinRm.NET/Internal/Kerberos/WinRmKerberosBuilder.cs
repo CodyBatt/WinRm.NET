@@ -7,14 +7,15 @@
         : WinRmBuilder<IWinRmKerberosSessionBuilder>, IWinRmKerberosSessionBuilder
     {
         private string? realm;
-        private HostInfo? kdcInfo;
+        private string? kdc;
+        private string? spn;
 
         public WinRmKerberosBuilder(WinRmSessionBuilder parent)
             : base(AuthType.Kerberos, parent)
         {
         }
 
-        public override IWinRmSession Build(string host)
+        public override IWinRmSession Build(string host, int? port = null)
         {
             if (User == null)
             {
@@ -26,22 +27,28 @@
                 throw new InvalidOperationException("Realm must be specified for Kerberos authentication.");
             }
 
-            if (kdcInfo == null)
+            if (kdc == null)
             {
-                throw new InvalidOperationException("KDC info must be specified for Kerberos authentication.");
+                throw new InvalidOperationException("KDC address must be specified for Kerberos authentication.");
             }
 
             var securityEnvelope = new KerberosSecurityEnvelope(
                 Parent.Logger,
                 new Credentials(User, Password!),
                 realm ?? throw new InvalidOperationException("Realm must be specified when AuthType is Kerberos."),
-                kdcInfo ?? throw new InvalidOperationException("KDC information must be specified when AuthType is Kerberos."));
+                kdc ?? throw new InvalidOperationException("KDC address must be specified when AuthType is Kerberos."),
+                spn);
 
-            return new WinRmSession(
+            if (this.Parent.LoggerFactory != null)
+            {
+                securityEnvelope.SetLoggerFactory(this.Parent.LoggerFactory);
+            }
+
+            return new WinRmSession(host,
+                securityEnvelope,
                 Parent.HttpClientFactory ?? new DefaultHttpClientFactory(),
                 Parent.Logger,
-                host,
-                securityEnvelope);
+                port);
         }
 
         public IWinRmKerberosSessionBuilder WithRealmName(string realm)
@@ -50,13 +57,15 @@
             return this;
         }
 
-        public IWinRmKerberosSessionBuilder WithKdc(string host, string address)
+        public IWinRmKerberosSessionBuilder WithKdc(string address)
         {
-            kdcInfo = new HostInfo
-            {
-                Name = host,
-                Address = address,
-            };
+            this.kdc = address;
+            return this;
+        }
+
+        public IWinRmKerberosSessionBuilder WithSpn(string? spn)
+        {
+            this.spn = spn;
             return this;
         }
     }

@@ -15,7 +15,7 @@
 
         protected WinRmSessionBuilder Parent => parent;
 
-        public abstract IWinRmSession Build(string host);
+        public abstract IWinRmSession Build(string host, int? port = null);
 
         public TReturnType WithPassword(string password)
         {

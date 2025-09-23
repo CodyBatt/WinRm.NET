@@ -8,9 +8,13 @@
 
     public sealed class WinRmSessionBuilder : IWinRm, IWinRmConfig
     {
-        internal ILogger? Logger { get; private set; }
+        internal ILoggerFactory? LoggerFactory { get; private set; }
+
+        internal ILogger? Logger => LazyLogger.Value;
 
         internal IHttpClientFactory? HttpClientFactory { get; private set; }
+
+        private Lazy<ILogger?> LazyLogger => new Lazy<ILogger?>(LoggerFactory?.CreateLogger("WinRm.NET") ?? null);
 
         // Choose one of the following authentication types
         public IWinRmKerberosSessionBuilder WithKerberos() => new WinRmKerberosBuilder(this);
@@ -20,13 +24,13 @@
         public IWinRmBasicSessionBuilder WithBasic() => new WinRmBasicBuilder(this);
 
         // Integration points
-        public IWinRm WithLogger(ILogger? logger)
+        public IWinRm WithLogger(ILoggerFactory logger)
         {
-            Logger = logger;
+            LoggerFactory = logger;
             return this;
         }
 
-        public IWinRm WithHttpClientFactory(IHttpClientFactory? httpClientFactory)
+        public IWinRm WithHttpClientFactory(IHttpClientFactory httpClientFactory)
         {
             HttpClientFactory = httpClientFactory;
             return this;

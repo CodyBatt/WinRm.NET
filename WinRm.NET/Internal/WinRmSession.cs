@@ -7,15 +7,20 @@
     {
         private bool disposedValue;
 
-        public WinRmSession(IHttpClientFactory clientFactory,
-        ILogger? logger,
-        string host,
-        ISecurityEnvelope securityEnvelope)
+        public WinRmSession(string host,
+            ISecurityEnvelope securityEnvelope,
+            IHttpClientFactory clientFactory,
+            ILogger? logger = null,
+            int? port = null)
         {
             HttpClientFactory = clientFactory;
-            Logger = logger;
             Host = host;
             SecurityEnvelope = securityEnvelope;
+            Logger = logger;
+            if (port.HasValue)
+            {
+                Port = port.Value;
+            }
         }
 
         internal IHttpClientFactory HttpClientFactory { get; private set; }
@@ -24,9 +29,13 @@
 
         internal string Host { get; private set; }
 
+        internal int Port { get; private set; } = 5985; // Default WinRM HTTP port
+
+        internal string? Ip { get; private set; }
+
         internal ISecurityEnvelope SecurityEnvelope { get; private set; }
 
-        public async Task<IWinRmResult> Run(string command, IEnumerable<string>? arguments = null)
+        public async Task<IWinRmResult> Run(string command, params string[]? arguments)
         {
             Log.RunningCommand(Logger, SecurityEnvelope.AuthType, command, Host, SecurityEnvelope.User);
             try
@@ -63,6 +72,11 @@
                         await protocol.TerminateOperation(shellId, commandId);
                         Log.TerminatedCommand(Logger, shellId, commandId);
                     }
+                }
+                catch (Exception ex)
+                {
+                    Log.Dbg(Logger, $"An unexpected error occured: {ex.Message}");
+                    throw;
                 }
                 finally
                 {

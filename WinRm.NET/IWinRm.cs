@@ -43,11 +43,11 @@
         IWinRm WithHttpClientFactory(IHttpClientFactory httpClientFactory);
 
         /// <summary>
-        /// Allows consumers to inject their own ILogger instance derived
+        /// Allows consumers to inject their own ILoggerFactory instance derived
         /// from whatever logging framework is in use.
         /// </summary>
-        /// <param name="logger">An ILogger instance</param>
+        /// <param name="logger">An ILoggerFactory instance</param>
         /// <returns>IWinRm</returns>
-        IWinRm WithLogger(ILogger logger);
+        IWinRm WithLogger(ILoggerFactory logger);
     }
 }
