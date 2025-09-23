@@ -11,10 +11,10 @@
         [Option('s', "security", Required = false, HelpText = "Specify the security protocol to use: Kerberos, Ntlm or Basic", Default = AuthType.Kerberos)]
         public AuthType Authentication { get; set; }
 
-        [Option('c', "command", Required = true, HelpText = "Specify the command to run")]
+        [Option('c', "command", Required = true, HelpText = "Specify the command to run, this can be a UCS2-LE Base64 encoded powershell script if -e is set.")]
         required public string Command { get; set; }
 
-        [Option('e', "encoded", Required = false, HelpText = "Indicates that the command is base64 encoded powershell", Default = false)]
+        [Option('e', "encoded", Required = false, HelpText = "Indicates that the command is intended to be passed as powershell -EncodedCommand parameter. (UCS-2LE Base64 Encoded)", Default = false)]
         required public bool Encoded { get; set; } = false;
 
         [Option('a', "args", Required = false, HelpText = "Specify command arguments")]

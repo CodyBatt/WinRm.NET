@@ -5,20 +5,15 @@
     using WinRm.NET.Internal;
     using WinRm.NET.Internal.Ntlm;
 
-    // This is based on a packet capture on some test machines to ensure that
-    // we are able to build, parse and compute a real-world NTLMv2 authentication message
-    // It is disabled because it requires you to set the password.
+    // This test uses canned values from a real-world packet capture on some test machines.
+    // Ensures that we are able to build, parse and compute a real-world NTLMv2 authentication message
     public class NtlmAuthSession
     {
-#pragma warning disable xUnit1004 // Test methods should not be skipped
-        [Fact(Skip = "Requires a password")]
-#pragma warning restore xUnit1004 // Test methods should not be skipped
-
+        [Fact]
         public void SimulateNegotiation()
         {
-            var password = string.Empty; // Set the password to run this test
-            // Gotta have the password for this test to work
-            var credentials = new Credentials("cbatt-adm@DAN.VMCLOUD", password);
+            // These credentials were used in the packet capture and are no longer valid.
+            var credentials = new Credentials("cbatt-adm@DAN.VMCLOUD", Encoding.UTF8.GetString(Convert.FromBase64String("cm9vdDRFRE1a")));
 
             // Make sure we can parse and generate the negotiate message
             var b64Negotiate = "TlRMTVNTUAABAAAAt4II4gAAAAAAAAAAAAAAAAAAAAAKAPRlAAAADw==";
