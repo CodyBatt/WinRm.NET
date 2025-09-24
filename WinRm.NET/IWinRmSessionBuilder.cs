@@ -26,10 +26,12 @@
     public interface IWinRmKerberosSessionBuilder
         : IWinRmSessionBuilder<IWinRmKerberosSessionBuilder>
     {
-        IWinRmKerberosSessionBuilder WithRealmName(string realm);
+        IWinRmKerberosSessionBuilder WithRealmName(string? realm);
 
-        IWinRmKerberosSessionBuilder WithKdc(string address);
+        IWinRmKerberosSessionBuilder WithKdc(string? address);
 
         IWinRmKerberosSessionBuilder WithSpn(string? spn);
+
+        IWinRmKerberosSessionBuilder WithDns(string? dns);
     }
 }
