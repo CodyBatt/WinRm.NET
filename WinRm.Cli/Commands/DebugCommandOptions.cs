@@ -3,7 +3,7 @@
     using CommandLine;
     using WinRm.NET;
 
-    [Verb("debug", HelpText = "Decrypt a WinRM payload given an athenticate message and password")]
+    [Verb("debug", HelpText = "Decrypt a WinRM payload given an authenticate message and password")]
     public class DebugCommandOptions : ICliCommand
     {
         [Option('a', "authenticate_message", Required = true, HelpText = "Base64-encoded authenticate message from HTTP header")]

@@ -14,6 +14,7 @@
     using global::Kerberos.NET.Credentials;
     using global::Kerberos.NET.Crypto;
     using global::Kerberos.NET.Entities;
+    using global::Kerberos.NET.PortableDns;
     using Microsoft.Extensions.Logging;
     using WinRm.NET.Internal.Http;
     using WinRm.NET.Internal.Ntlm;
@@ -21,18 +22,29 @@
     internal sealed class KerberosSecurityEnvelope : SecurityEnvelope
     {
         private readonly Credentials credentials;
-        private readonly string realmName;
-        private readonly string kdcAddress;
+        private readonly string? realmName;
+        private readonly string? kdcAddress;
         private string? targetSpn;
+        private string? dnsServer;
         private ILoggerFactory? loggerFactory;
 
-        public KerberosSecurityEnvelope(ILogger? logger, Credentials credentials, string realm, string kdc, string? spn)
+        public KerberosSecurityEnvelope(ILogger? logger, Credentials credentials, string? realm, string? kdc, string? spn, string? dns)
             : base(logger)
         {
             this.credentials = credentials;
-            realmName = realm.ToUpper(CultureInfo.InvariantCulture);
+            realmName = realm?.ToUpper(CultureInfo.InvariantCulture);
             kdcAddress = kdc;
             targetSpn = spn;
+            dnsServer = dns;
+
+            if (string.IsNullOrEmpty(dnsServer))
+            {
+                PortableDnsClient.Configure();
+            }
+            else
+            {
+                PortableDnsClient.Configure(dnsServer);
+            }
         }
 
         public override string User => this.credentials.User;
@@ -44,6 +56,25 @@
         private KerberosCryptoTransformer? Encryptor { get; set; }
 
         private KrbEncryptionKey? Key { get; set; }
+
+        private string Realm
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(realmName))
+                {
+                    return realmName.ToUpper(CultureInfo.InvariantCulture);
+                }
+
+                var (_, realm) = SplitKerberosPrincipal(credentials.User);
+                if (!string.IsNullOrEmpty(realm))
+                {
+                    return realm.ToUpper(CultureInfo.InvariantCulture);
+                }
+
+                throw new InvalidOperationException("Realm name must be specified either explicitly or as part of the user principal name (user@REALM).");
+            }
+        }
 
         public void SetLoggerFactory(ILoggerFactory loggerFactory)
         {
@@ -58,14 +89,17 @@
             {
                 Defaults =
                 {
-                    DefaultRealm = realmName,
-                    DnsLookupKdc = false,
+                    DefaultRealm = Realm,
+                    DnsLookupKdc = string.IsNullOrEmpty(kdcAddress),
                     DefaultCCacheName = "MEMORY:",
                 },
             };
 
             var krb5Client = new KerberosClient(krb5Conf, loggerFactory);
-            krb5Client.PinKdc(realmName, kdcAddress);
+            if (!string.IsNullOrEmpty(kdcAddress))
+            {
+                krb5Client.PinKdc(Realm, kdcAddress);
+            }
 
             var creds = new KerberosPasswordCredential(credentials.User, credentials.Password);
             await krb5Client.Authenticate(creds);
@@ -191,6 +225,31 @@
         protected override void SetHeaders(HttpRequestHeaders headers)
         {
             // Nothing to do here
+        }
+
+        /// <summary>
+        /// Splits a Kerberos principal name into user and realm components.
+        /// </summary>
+        /// <param name="principal">The principal name in format "user@realm" or just "user"</param>
+        /// <returns>A tuple containing the user part and realm part (realm will be null if not present)</returns>
+        private static (string User, string? Realm) SplitKerberosPrincipal(string principal)
+        {
+            if (string.IsNullOrEmpty(principal))
+            {
+                throw new ArgumentException("Kerberos principal name cannot be null or empty.", nameof(principal));
+            }
+
+            var atIndex = principal.LastIndexOf('@');
+            if (atIndex == -1 || atIndex == 0 || atIndex == principal.Length - 1)
+            {
+                // No '@' found, or '@' at start/end - treat as user-only principal
+                return (principal, null);
+            }
+
+            var user = principal.Substring(0, atIndex);
+            var realm = principal.Substring(atIndex + 1);
+
+            return (user, realm);
         }
     }
 }

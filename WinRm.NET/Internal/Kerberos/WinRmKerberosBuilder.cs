@@ -9,6 +9,7 @@
         private string? realm;
         private string? kdc;
         private string? spn;
+        private string? dns;
 
         public WinRmKerberosBuilder(WinRmSessionBuilder parent)
             : base(AuthType.Kerberos, parent)
@@ -22,22 +23,13 @@
                 throw new InvalidOperationException("User must be specified");
             }
 
-            if (realm == null)
-            {
-                throw new InvalidOperationException("Realm must be specified for Kerberos authentication.");
-            }
-
-            if (kdc == null)
-            {
-                throw new InvalidOperationException("KDC address must be specified for Kerberos authentication.");
-            }
-
             var securityEnvelope = new KerberosSecurityEnvelope(
                 Parent.Logger,
                 new Credentials(User, Password!),
-                realm ?? throw new InvalidOperationException("Realm must be specified when AuthType is Kerberos."),
-                kdc ?? throw new InvalidOperationException("KDC address must be specified when AuthType is Kerberos."),
-                spn);
+                realm,
+                kdc,
+                spn,
+                dns);
 
             if (this.Parent.LoggerFactory != null)
             {
@@ -51,13 +43,13 @@
                 port);
         }
 
-        public IWinRmKerberosSessionBuilder WithRealmName(string realm)
+        public IWinRmKerberosSessionBuilder WithRealmName(string? realm)
         {
             this.realm = realm;
             return this;
         }
 
-        public IWinRmKerberosSessionBuilder WithKdc(string address)
+        public IWinRmKerberosSessionBuilder WithKdc(string? address)
         {
             this.kdc = address;
             return this;
@@ -66,6 +58,12 @@
         public IWinRmKerberosSessionBuilder WithSpn(string? spn)
         {
             this.spn = spn;
+            return this;
+        }
+
+        public IWinRmKerberosSessionBuilder WithDns(string? dns)
+        {
+            this.dns = dns;
             return this;
         }
     }

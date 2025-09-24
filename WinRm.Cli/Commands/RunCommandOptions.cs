@@ -42,6 +42,9 @@
         [Option('S', "spn", Required = false, HelpText = "Specify the Kerberos SPN of the host target.")]
         public string? Spn { get; set; }
 
+        [Option('D', "dns", Required = false, HelpText = "Specify the DNS server to use.")]
+        public string? DnsServer { get; set; }
+
         public async Task<int> Execute()
         {
             RunCommandOptions opts = this;
@@ -66,8 +69,9 @@
                     .WithUser(opts.UserName)
                     .WithPassword(opts.Password!)
                     .WithRealmName(opts.RealmName)
-                    .WithKdc(opts.Kdc!)
+                    .WithKdc(opts.Kdc)
                     .WithSpn(opts.Spn)
+                    .WithDns(opts.DnsServer)
                     .Build(opts.HostName),
                 AuthType.Ntlm => sessionBuilder.WithNtlm()
                     .WithUser(opts.UserName)
